@@ -13,7 +13,7 @@ class Coordinates:
     y: int
 
     @staticmethod
-    def from_list(coordinates: list[int]):
+    def from_list(coordinates: list[int]) -> "Coordinates":
         """
         Creates a Coordinates object from a list of x- and y-coordinate components.
 

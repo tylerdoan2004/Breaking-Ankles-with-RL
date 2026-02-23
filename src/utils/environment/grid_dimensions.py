@@ -4,6 +4,7 @@ This module provides the GridDimensions class for representing the dimensions of
 from dataclasses import dataclass
 from utils.environment.coordinates import Coordinates
 
+
 @dataclass(frozen = True)
 class GridDimensions:
     """
@@ -11,9 +12,9 @@ class GridDimensions:
     """
     width: int
     height: int
-    
+
     @staticmethod
-    def from_tuple(grid_dimensions: tuple[int, int]):
+    def from_tuple(grid_dimensions: tuple[int, int]) -> "GridDimensions":
         """
         Creates a GridDimensions object from a tuple of width and height.
         
