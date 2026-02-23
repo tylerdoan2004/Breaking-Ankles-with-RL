@@ -445,8 +445,8 @@ def validate_system_configuration(system_configuration: SystemConfiguration) -> 
                                                 system_configuration.environment.obstacles_coordinates)
     if minimum_moves is None:
         raise ValueError(f"The agent cannot reach the goal coordinates from the start coordinates given the obstacles: {system_configuration.environment.obstacles_coordinates}")
-    minimum_time_steps_to_reach_goal = calculate_minimum_time_steps_to_reach_goal(minimum_moves, system_configuration.agent.velocity)
 
+    minimum_time_steps_to_reach_goal = calculate_minimum_time_steps_to_reach_goal(minimum_moves, system_configuration.agent.velocity)
     if not is_episode_time_limit_sufficient(system_configuration.environment.episode_time_limit, minimum_time_steps_to_reach_goal):
         raise ValueError(f"The agent cannot reach the goal coordinates within the episode time limit: {system_configuration.environment.episode_time_limit}")
 
