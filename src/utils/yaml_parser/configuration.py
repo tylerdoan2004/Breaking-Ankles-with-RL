@@ -31,6 +31,7 @@ class AgentConfiguration:
     goal_coordinates: Coordinates
     velocity: int
     visibility_radius: int
+    observation_stack_depth: int
 
     @staticmethod
     def from_dict(agent_config: dict) -> "AgentConfiguration":
@@ -50,7 +51,8 @@ class AgentConfiguration:
             start_coordinates = Coordinates.from_list(agent_config["start_coordinates"]),
             goal_coordinates = Coordinates.from_list(agent_config["goal_coordinates"]),
             velocity = agent_config["velocity"],
-            visibility_radius = agent_config["visibility_radius"]
+            visibility_radius = agent_config["visibility_radius"],
+            observation_stack_depth = agent_config["observation_stack_depth"]
         )
 
 
@@ -135,7 +137,7 @@ class SystemConfiguration:
 
         if not is_environment_config_shallowly_valid(system_config["environment"]):
             raise ValueError(f"The system configuration does not have a valid environment configuration: {system_config}")
-        
+
         system_configuration = SystemConfiguration(
             agent = AgentConfiguration.from_dict(system_config["agent"]),
             seekers = [SeekerConfiguration.from_dict(seeker_config) for seeker_config in system_config["seekers"]],
@@ -158,7 +160,7 @@ class SystemConfiguration:
             raise ValueError(f"The specified configuration file must be a valid YAML file: {config_file}")
 
         data = load_yaml_file(config_file)
-        
+
         if not is_system_config_shallowly_valid(data):
             raise ValueError(f"The specified configuration file is not a valid system configuration: {config_file}")
 

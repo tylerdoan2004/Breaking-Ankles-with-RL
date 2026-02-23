@@ -103,6 +103,17 @@ def is_visibility_radius_valid(visibility_radius: int) -> bool:
     return visibility_radius > 0
 
 
+def is_observation_stack_depth_valid(observation_stack_depth: int) -> bool:
+    """
+    Checks if the specified observation stack depth is valid.
+    
+    :param observation_stack_depth: The observation stack depth to check.
+    :return: True if the observation stack depth is valid, False otherwise.
+    """
+    # The observation stack includes the current observation
+    return observation_stack_depth > 0
+
+
 def is_agent_config_shallowly_valid(data: Any) -> bool:
     """
     Checks shallowly if the object is a valid agent configuration dictionary. Does not check if the start coordinates or goal coordinates are valid.
@@ -112,11 +123,13 @@ def is_agent_config_shallowly_valid(data: Any) -> bool:
     """
     if not isinstance(data, dict):
         return False
-    if set(data.keys()) != {"start_coordinates", "goal_coordinates", "velocity", "visibility_radius"}:
+    if set(data.keys()) != {"start_coordinates", "goal_coordinates", "velocity", "visibility_radius", "observation_stack_depth"}:
         return False
     if not isinstance(data["velocity"], int) or not is_velocity_valid(data["velocity"]):
         return False
     if not isinstance(data["visibility_radius"], int) or not is_visibility_radius_valid(data["visibility_radius"]):
+        return False
+    if not isinstance(data["observation_stack_depth"], int) or not is_observation_stack_depth_valid(data["observation_stack_depth"]):
         return False
     return True
 
