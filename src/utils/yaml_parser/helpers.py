@@ -1,5 +1,5 @@
 """
-This module provides helper functions for the command line parser.
+This module provides helper functions for the YAML parser.
 """
 from __future__ import annotations
 from typing import TYPE_CHECKING
