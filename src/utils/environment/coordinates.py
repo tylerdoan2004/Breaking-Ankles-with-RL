@@ -2,7 +2,8 @@
 This module provides the Coordinates class for representing coordinates in a two-dimensional gridworld.
 """
 from dataclasses import dataclass
-
+from types import NotImplementedType
+from utils.environment.vector import Vector
 
 @dataclass(frozen = True)
 class Coordinates:
@@ -22,24 +23,44 @@ class Coordinates:
         """
         return Coordinates(coordinates[0], coordinates[1])
 
-    def __add__(self, other: "Coordinates") -> "Coordinates":
+    def __add__(self, other: object) -> "Coordinates":
         """
-        Adds this Coordinates object to another Coordinates object component-wise.
-        
-        :param other: The Coordinates object to add.
-        :return: A new Coordinates object representing the component-wise sum of the two Coordinates objects.
+        Implements the addition operator for Coordinates objects.
+
+        :param other: The object to add.
+        :return: A new Coordinates object representing the component-wise sum of the coordinates with the vector or NotImplemented.
         """
-        if not isinstance(other, Coordinates):
+        if not isinstance(other, Vector):
             return NotImplemented
         return Coordinates(self.x + other.x, self.y + other.y)
 
-    def __sub__(self, other: "Coordinates") -> "Coordinates":
+    def __radd__(self, other: object) -> "Coordinates":
         """
-        Subtracts another Coordinates object from this Coordinates object component-wise.
+        Implements the right addition operator for Coordinates objects.
+
+        :param other: The object to add.
+        :return: A new Coordinates object representing the component-wise sum of the coordinates with the vector or NotImplemented.
+        """
+        return self + other
+
+    def __sub__(self, other: object) -> "Coordinates | Vector":
+        """
+        Implements the subtraction operator for Coordinates objects.
         
-        :param other: The Coordinates object to subtract.
-        :return: A new Coordinates object representing the component-wise difference between the two Coordinates objects.
+        :param other: The object to subtract.
+        :return: A new Coordinates object representing the component-wise difference of the coordinates with the vector, a Vector object representing the component-wise difference of the two coordinates, or NotImplemented.
         """
-        if not isinstance(other, Coordinates):
-            return NotImplemented
-        return Coordinates(self.x - other.x, self.y - other.y)
+        if isinstance(other, Vector):
+            return Coordinates(self.x - other.x, self.y - other.y)
+        if isinstance(other, Coordinates):
+            return Vector(self.x - other.x, self.y - other.y)
+        return NotImplemented
+
+    def __rsub__(self, other: object) -> NotImplementedType:
+        """
+        Implements the right subtraction operator for Coordinates objects.
+        
+        :param other: The object to subtract.
+        :return: NotImplemented.
+        """
+        return NotImplemented
