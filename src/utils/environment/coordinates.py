@@ -2,7 +2,6 @@
 This module provides the Coordinates class for representing coordinates in a two-dimensional gridworld.
 """
 from dataclasses import dataclass
-from utils.environment.vector import Vector
 
 
 @dataclass(frozen = True)
@@ -44,12 +43,3 @@ class Coordinates:
         if not isinstance(other, Coordinates):
             return NotImplemented
         return Coordinates(self.x - other.x, self.y - other.y)
-
-    def shift_by(self, vector: Vector) -> "Coordinates":
-        """
-        Shifts this Coordinates object by the given Vector object component-wise.
-        
-        :param vector: The Vector object to shift by.
-        :return: A new Coordinates object representing the shifted Coordinates object.
-        """
-        return Coordinates(self.x + vector.x, self.y + vector.y)
