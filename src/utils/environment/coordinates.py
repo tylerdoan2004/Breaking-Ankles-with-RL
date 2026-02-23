@@ -21,3 +21,25 @@ class Coordinates:
         :return: A Coordinates object.
         """
         return Coordinates(coordinates[0], coordinates[1])
+
+    def __add__(self, other: "Coordinates") -> "Coordinates":
+        """
+        Adds this Coordinates object to another Coordinates object component-wise.
+        
+        :param other: The Coordinates object to add.
+        :return: A new Coordinates object representing the component-wise sum of the two Coordinates objects.
+        """
+        if not isinstance(other, Coordinates):
+            return NotImplemented
+        return Coordinates(self.x + other.x, self.y + other.y)
+
+    def __sub__(self, other: "Coordinates") -> "Coordinates":
+        """
+        Subtracts another Coordinates object from this Coordinates object component-wise.
+        
+        :param other: The Coordinates object to subtract.
+        :return: A new Coordinates object representing the component-wise difference between the two Coordinates objects.
+        """
+        if not isinstance(other, Coordinates):
+            return NotImplemented
+        return Coordinates(self.x - other.x, self.y - other.y)
