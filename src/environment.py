@@ -1,228 +1,362 @@
-from minigrid.minigrid_env import MiniGridEnv  
-from minigrid.core.grid import Grid  
-from minigrid.core.world_object import Goal, Wall, Ball
-from minigrid.core.mission import MissionSpace
-import gymnasium as gym
-from gymnasium import spaces
+"""
+This module provides the ReactiveAvoidanceEnvironment class for representing a two-dimensional gridworld environment where an agent traverses from some start coordinates to some goal coordinates while avoiding static obstacles and one or more seekers.
+"""
+from gymnasium.core import ActType
 import numpy as np
-from typing import Optional
+from collections import deque
+from typing import Any, cast, Optional
+from gymnasium.spaces import Discrete
+from minigrid.core.grid import Grid  
+from minigrid.core.mission import MissionSpace
+from minigrid.core.world_object import Goal, Wall
+from minigrid.minigrid_env import MiniGridEnv
+from src.utils.environment.coordinates import Coordinates
+from src.utils.environment.helpers import scale_absolute_coordinates, scale_relative_vector
+from src.utils.environment.vector import Vector
+from utils.environment.seeker import Seeker
+from utils.environment.helpers import calculate_observation_space
+from utils.yaml_parser.configuration import SystemConfiguration
 
 
-class Seeker(Ball):
-    """A red ball that acts as a seeker. Marked as overlappable so the agent
-    and other seekers can share cells (collision is checked manually)."""
-
-    def __init__(self):
-        super().__init__('red')
-
-    def can_overlap(self):
-        return True
-
-
-class RLEnvironment(MiniGridEnv):
-
-    def __init__(self, grid_size=16, max_steps=200, n_seekers=1, render_mode=None):
-        self.n_seekers = n_seekers
-        self.seeker_positions = []
-        self.seeker_objects = []
-
-        self.render_mode = render_mode
-
-        mission_space = MissionSpace(mission_func=lambda: "reach the goal")
-
-        self.vision_radius = 5  # cells illuminated around the runner
-
+class ReactiveAvoidanceEnv(MiniGridEnv):
+    """
+    A class for representing a two-dimensional gridworld environment where an agent traverses from some start coordinates to some goal coordinates while avoiding static obstacles and one or more seekers.
+    """
+    def __init__(self, config: SystemConfiguration, render_mode: Optional[str] = None) -> None:
+        """
+        Creates a ReactiveAvoidanceEnv object.
+        
+        :param config: A SystemConfiguration object representing the configuration of the agent-seeker-gridworld system.
+        :param render_mode: The rendering mode for the environment.
+        """
         super().__init__(
-            mission_space=mission_space,
-            grid_size=grid_size,
-            max_steps=max_steps,
-            render_mode=render_mode,
-            highlight=True,          # we override get_full_render to draw a circular mask
+            mission_space = MissionSpace(mission_func = lambda: "Traverse from some start coordinates to some goal coordinates while avoiding static obstacles and one or more seekers."),
+            width = config.environment.grid_dimensions.width,
+            height = config.environment.grid_dimensions.height,
+            max_steps = config.environment.episode_time_limit,
+            # TODO: Set see_through_walls to False and handle occlusion
+            see_through_walls = True,
+            render_mode = render_mode
         )
+        self.config = config
+        # Initialize the internal dynamic components of the environment state
+        self._current_step = 0
+        self._current_agent_coordinates = config.agent.start_coordinates
+        self._current_seeker_coordinates = [seeker.start_coordinates for seeker in config.seekers]
+        current_local_observation = self._compute_local_observation()
+        self._current_local_observation_history: deque[np.ndarray] = deque(maxlen = config.agent.observation_stack_depth)
+        for _ in range(config.agent.observation_stack_depth):
+            self._current_local_observation_history.append(current_local_observation)
 
-        self.action_space = spaces.Discrete(8)
+        # Override the default action space and observation space
+        self.action_space = Discrete(9)
+        self._action_map = {
+            0: Vector(0, 0),   # No-op
+            1: Vector(0, 1),  # Up
+            2: Vector(1, 0),   # Right
+            3: Vector(0, -1),   # Down
+            4: Vector(-1, 0),  # Left
+            5: Vector(1, 1),  # Up-Right
+            6: Vector(1, -1),   # Down-Right
+            7: Vector(-1, 1), # Up-Left
+            8: Vector(-1, -1),  # Down-Left
+        }
+        self.observation_space = calculate_observation_space(config.agent.visibility_radius, config.agent.observation_stack_depth)
 
-        self.action_map = {
-            0: np.array([0, 1]),   # Right
-            1: np.array([-1, 0]),  # Up
-            2: np.array([0, -1]),  # Left
-            3: np.array([1, 0]),   # Down
-            4: np.array([1, 1]),   # Down-Right
-            5: np.array([-1, 1]),  # Up-Right
-            6: np.array([1, -1]),  # Down-Left
-            7: np.array([-1, -1]), # Up-Left
+    def _compute_local_observation(self) -> np.ndarray:
+        """
+        Computes the local observation for the current environment state. For each cell within the agent's visibility radius, the local observation includes whether the agent observes an obstacle, whether the agent observes a seeker, and whether the agent observes the goal.
+        
+        :return: The local observation for the current environment state.
+        """
+        visibility_radius = self.config.agent.visibility_radius
+        visibility_diameter = 2 * visibility_radius + 1
+        # TODO: Add two channels: whether the agent observes an out-of-bounds cell and whether the agent observes an occluded cell
+        # TODO: If the agent observes an occluded cell, all other channels should be set to 0
+        local_observation = np.zeros((3, visibility_diameter, visibility_diameter), dtype = np.float32)
+        for dx in range(-visibility_radius, visibility_radius + 1):
+            for dy in range(-visibility_radius, visibility_radius + 1):
+                current_coordinates = Coordinates(self._current_agent_coordinates.x + dx, self._current_agent_coordinates.y + dy)
+                if not self.config.environment.grid_dimensions.contains_coordinates(current_coordinates):
+                    continue
+                if current_coordinates in self.config.environment.obstacles_coordinates:
+                    local_observation[0, dx + visibility_radius, dy + visibility_radius] = 1.0
+                if current_coordinates in self._current_seeker_coordinates:
+                    local_observation[1, dx + visibility_radius, dy + visibility_radius] = 1.0
+                if current_coordinates == self.config.agent.goal_coordinates:
+                    local_observation[2, dx + visibility_radius, dy + visibility_radius] = 1.0
+        return local_observation.reshape(-1)
+
+    def _get_obs(self) -> np.ndarray:
+        """
+        Converts the environment state into an observation vector.
+        
+        :return: The observation vector.
+        """
+        scaled_current_agent_coordinates = scale_absolute_coordinates(self._current_agent_coordinates,
+                                                                      self.config.environment.grid_dimensions.width, self.config.environment.grid_dimensions.height)
+        scaled_relative_goal_vector = scale_relative_vector(self.config.agent.goal_coordinates - self._current_agent_coordinates,
+                                                            self.config.environment.grid_dimensions.width, self.config.environment.grid_dimensions.height)
+        observation_stack = np.concatenate(self._current_local_observation_history, dtype = np.float32)
+        return np.concatenate((scaled_current_agent_coordinates, scaled_relative_goal_vector, observation_stack), dtype = np.float32)
+
+    def _get_info(self, *, outcome: Optional[str] = None) -> dict[str, Any]:
+        """
+        Computes auxiliary diagnostic information about the current environment state and the current episode.
+        
+        :param outcome: The outcome of the current episode.
+        :return: A dictionary of auxiliary diagnostic information.
+        """
+        return {
+            "current_step": self._current_step,
+            "current_agent_coordinates": self._current_agent_coordinates,
+            "current_seeker_coordinates": self._current_seeker_coordinates,
+            "current_local_observation_history": self._current_local_observation_history,
+            "outcome": outcome
         }
 
-        self.observation_space = spaces.Dict({
-            'agent': spaces.Box(0, grid_size-1, shape=(2,), dtype=np.int32),
-            'goal': spaces.Box(0, grid_size-1, shape=(2,), dtype=np.int32),
-            'seekers': spaces.Box(0, grid_size-1, shape=(n_seekers, 2), dtype=np.int32),
-        })
+    def reset(self, *, seed: Optional[int] = None, options: Optional[dict] = None) -> tuple[np.ndarray, dict[str, Any]]:
+        """
+        Resets the environment to its initial state.
+        
+        :param seed: The seed for the environment's random number generator.
+        :param options: A dictionary of options specifying how to reset the environment.
+        """
+        # Calls self._gen_grid() internally to set up the grid for the reactive avoidance environment
+        super().reset(seed = seed, options = options)
+        self._current_step = 0
+        self._current_agent_coordinates = self.config.agent.start_coordinates
+        self._current_seeker_coordinates = [seeker.start_coordinates for seeker in self.config.seekers]
+        current_local_observation = self._compute_local_observation()
+        self._current_local_observation_history = deque(maxlen = self.config.agent.observation_stack_depth)
+        for _ in range(self.config.agent.observation_stack_depth):
+            self._current_local_observation_history.append(current_local_observation)
+        return self._get_obs(), self._get_info() 
 
-    def get_full_render(self, highlight: bool, tile_size: int):
-        """Replace the default directional FOV cone with a circular vision
-        radius centred on the runner."""
-        highlight_mask = np.zeros((self.width, self.height), dtype=bool)
+    def _gen_grid(self, width: int, height: int) -> None:
+        """
+        Implements the _gen_grid abstract method from the MiniGridEnv class. Sets up the grid for the reactive avoidance environment.
+        
+        :param width: The width of the grid.
+        :param height: The height of the grid.
+        :return: None.
+        """
+        # Initialize the grid
+        self.grid = Grid(width, height)
+        self.grid.wall_rect(0, 0, width, height)
+
+        # Place agent on the grid
+        self.agent_pos = (self.config.agent.start_coordinates.x, self.config.agent.start_coordinates.y)
+    
+        # Place goal on the grid
+        self.grid.set(self.config.agent.goal_coordinates.x, self.config.agent.goal_coordinates.y, Goal())
+    
+        # Place seekers on the grid
+        for seeker in self.config.seekers:
+            self.grid.set(seeker.start_coordinates.x, seeker.start_coordinates.y, Seeker())
+        
+        # Place obstacles on the grid
+        for obstacle in self.config.environment.obstacles_coordinates:
+            self.grid.set(obstacle.x, obstacle.y, Wall())
+
+    def _can_agent_be_in(self, coordinates: Coordinates) -> bool:
+        """
+        Checks if the agent can be in the given coordinates.
+        
+        :param coordinates: The coordinates to check.
+        :return: True if the agent can be in the given coordinates, False otherwise.
+        """
+        if not self.config.environment.grid_dimensions.contains_coordinates(coordinates):
+            return False
+        if coordinates in self.config.environment.obstacles_coordinates:
+            return False
+        if coordinates in self._current_seeker_coordinates:
+            return False
+        return True
+
+    def _move_agent(self, action: int) -> Coordinates:
+        """
+        Moves the agent in the environment based on the given action.
+        
+        :param action: The action to take in the environment.
+        :return: The new coordinates of the agent.
+        """
+        movement_vector = self._action_map[int(action)]
+        for _ in range(self.config.agent.velocity):
+            # Move the agent in the selected direction
+            # NOTE: This movement allows the agent to 'slip' through diagonal obstacles
+            # TODO: Create shared motion logic between environment and validator
+            self._current_agent_coordinates += movement_vector
+            # If the agent cannot be in the new coordinates or if the agent has reached the goal, return the new coordinates
+            if not self._can_agent_be_in(self._current_agent_coordinates) or self._current_agent_coordinates == self.config.agent.goal_coordinates:
+                # Update the agent's coordinates in the grid
+                self.agent_pos = (self._current_agent_coordinates.x, self._current_agent_coordinates.y)
+                return self._current_agent_coordinates
+        # Update the agent's coordinates in the grid
+        self.agent_pos = (self._current_agent_coordinates.x, self._current_agent_coordinates.y)
+        # Return the final coordinates
+        return self._current_agent_coordinates
+
+    def _seeker_policy(self, current_coordinates: Coordinates, current_agent_coordinates: Coordinates) -> Vector:
+        """
+        Returns the movement vector that minimizes the Chebyshev distance between the seeker and the agent.
+        
+        :param current_coordinates: The current coordinates of the seeker.
+        :param current_agent_coordinates: The current coordinates of the agent.
+        :return: The movement vector that minimizes the Chebyshev distance between the seeker and the agent.
+        """
+        return Vector(
+            np.sign(current_agent_coordinates.x - current_coordinates.x).astype(int),
+            np.sign(current_agent_coordinates.y - current_coordinates.y).astype(int)
+        )
+
+    def _move_seeker(self, current_coordinates: Coordinates, velocity: int) -> Coordinates:
+        """
+        Moves the seeker in the environment based on its current coordinates and velocity.  The seeker picks the action that minimizes Chebyshev distance to the agent.
+        
+        :param current_coordinates: The current coordinates of the seeker.
+        :param velocity: The velocity of the seeker.
+        :return: The new coordinates of the seeker.
+        """
+        # Remove the old seeker from the grid
+        self.grid.set(current_coordinates.x, current_coordinates.y, None)
+        for _ in range(velocity):
+            movement_vector = self._seeker_policy(current_coordinates, self._current_agent_coordinates)
+            new_coordinates = current_coordinates + movement_vector
+            # If the seeker cannot be in the new coordinates or if the new coordinates are the goal coordinates, return the old coordinates
+            if not self._can_agent_be_in(new_coordinates) or new_coordinates == self.config.agent.goal_coordinates:
+                # Update the seeker's coordinates in the grid
+                self.grid.set(current_coordinates.x, current_coordinates.y, Seeker())
+                return current_coordinates
+            # Otherwise, move the seeker in the selected direction
+            current_coordinates += movement_vector
+        # Update the seeker's coordinates in the grid
+        self.grid.set(current_coordinates.x, current_coordinates.y, Seeker())
+        return current_coordinates
+
+    def step(self, action: object) -> tuple[np.ndarray, float, bool, bool, dict[str, Any]]:
+        """
+        Performs a single step in the environment.
+        
+        :param action: The action to take in the environment.
+        :return: A tuple containing the observation, reward, termination flag, truncation flag, and auxiliary info dictionary.
+        """
+        # TODO: Reward shaping
+        action = cast(int, action)
+        self._current_step += 1
+
+        # Move the agent
+        self._current_agent_coordinates = self._move_agent(action)
+
+        truncated = self._current_step >= self.config.environment.episode_time_limit
+
+        if not self._can_agent_be_in(self._current_agent_coordinates):
+            self._current_local_observation_history.append(self._compute_local_observation())
+            return self._get_obs(), -1.0, True, truncated, self._get_info(outcome = "collision")
+
+        if self._current_agent_coordinates == self.config.agent.goal_coordinates:
+            self._current_local_observation_history.append(self._compute_local_observation())
+            return self._get_obs(), 1.0, True, truncated, self._get_info(outcome = "goal")
+
+        # Move the seekers
+        for i, seeker in enumerate(self.config.seekers):
+            self._current_seeker_coordinates[i] = self._move_seeker(self._current_seeker_coordinates[i], seeker.velocity)
+
+        if self._current_agent_coordinates in self._current_seeker_coordinates:
+            self._current_local_observation_history.append(self._compute_local_observation())
+            return self._get_obs(), -1.0, True, truncated, self._get_info(outcome = "interception")
+
+        self._current_local_observation_history.append(self._compute_local_observation())
+        return self._get_obs(), -1 / self.config.environment.episode_time_limit, False, truncated, self._get_info(outcome = "timeout" if truncated else None)
+
+    # def step(self, action):
+
+    #     if isinstance(action, np.ndarray):
+    #         action = int(action.item())
+
+    #     # Get movement direction
+    #     direction = self.action_map[action]
+
+    #     # Calculate new position
+    #     new_pos = (
+    #         self.agent_pos[0] + direction[0],
+    #         self.agent_pos[1] + direction[1]
+    #     )
+
+    #     # Clip to grid boundaries
+    #     new_pos = (
+    #         int(np.clip(new_pos[0], 0, self.width - 1)),
+    #         int(np.clip(new_pos[1], 0, self.height - 1))
+    #     )
+
+    #     prev_dist = np.linalg.norm(np.array(self.agent_pos) - np.array(self.goal_pos))
+
+    #     # Check if cell is passable (seekers have can_overlap=True, so agent can step on them)
+    #     cell = self.grid.get(*new_pos)
+    #     if cell is None or cell.can_overlap():
+    #         self.agent_pos = new_pos
+        
+    #     # Increment step counter
+    #     self.step_count += 1
+
+    #     # Move seekers toward the agent after the agent moves
+    #     self._move_seekers()
+
+    #     # Check if a seeker caught the agent
+    #     if self._seeker_caught_agent():
+    #         observation = self.gen_obs()
+    #         return observation, -100.0, True, False, {}
+
+    #     # Check if reached goal
+    #     if tuple(self.agent_pos) == self.goal_pos:
+    #         reward = 100.0
+    #         terminated = True
+    #     else:
+    #         curr_dist = np.linalg.norm(np.array(self.agent_pos) - np.array(self.goal_pos))
+    #         dist_reward = (prev_dist - curr_dist) * 0.5
+
+    #         # Proximity bonus using inverse distance so it spikes sharply when
+    #         # adjacent to the goal (~8.0 at dist=1), overwhelming any seeker-fear
+    #         # and preventing oscillation. Falls to ~0 beyond 5 cells.
+    #         if curr_dist < 5.0:
+    #             proximity_bonus = min(8.0, 8.0 / max(curr_dist, 0.5)) - 1.6
+    #         else:
+    #             proximity_bonus = 0.0
+
+    #         reward = -0.1 + dist_reward + proximity_bonus
+    #         terminated = False
+
+    #     # Check if max steps reached
+    #     truncated = self.step_count >= self.max_steps
+
+    #     observation = self.gen_obs()
+    #     return observation, reward, terminated, truncated, {}
+
+    def get_full_render(self, highlight: bool = True, tile_size: Optional[int] = None) -> np.ndarray:
+        """
+        Overrides the get_full_render method from the MiniGridEnv class. Renders the full environment as an RGB image. Highlights a square of radius self.config.agent.visibility_radius around the agent.
+        
+        :param highlight: Whether to highlight the square of radius self.config.agent.visibility_radius around the agent.
+        :param tile_size: The size of each tile in the rendered image.
+        :return: The rendered image as an RGB array.
+        """
+        if tile_size is None:
+            tile_size = self.tile_size
+
+        highlight_mask = np.zeros((self.config.environment.grid_dimensions.width, self.config.environment.grid_dimensions.height), dtype = bool)
+
         if highlight:
-            ax, ay = self.agent_pos
-            r2 = self.vision_radius ** 2
-            for x in range(self.width):
-                for y in range(self.height):
-                    if (x - ax) ** 2 + (y - ay) ** 2 <= r2:
-                        highlight_mask[x, y] = True
+            visibility_radius = self.config.agent.visibility_radius
+            for dx in range(-visibility_radius, visibility_radius + 1):
+                for dy in range(-visibility_radius, visibility_radius + 1):
+                    current_coordinates = Coordinates(self._current_agent_coordinates.x + dx, self._current_agent_coordinates.y + dy)
+                    if not self.config.environment.grid_dimensions.contains_coordinates(current_coordinates):
+                        continue
+                    highlight_mask[current_coordinates.x, current_coordinates.y] = True
 
         return self.grid.render(
             tile_size,
-            self.agent_pos,
+            (self._current_agent_coordinates.x, self._current_agent_coordinates.y),
             self.agent_dir,
-            highlight_mask=highlight_mask,
+            highlight_mask = highlight_mask
         )
-
-    def _gen_grid(self, width, height):
-        self.grid = Grid(width, height)
-
-        # All spawnable positions (interior cells, excluding border)
-        # We track used positions to avoid overlaps
-        used = set()
-
-        def rand_pos():
-            """Pick a random interior cell not already occupied."""
-            while True:
-                x = int(self.np_random.integers(1, width - 1))
-                y = int(self.np_random.integers(1, height - 1))
-                if (x, y) not in used:
-                    used.add((x, y))
-                    return (x, y)
-
-        # Randomize goal position
-        self.goal_pos = rand_pos()
-        self.put_obj(Goal(), *self.goal_pos)
-
-        # Randomize agent (runner) position
-        agent_pos = rand_pos()
-        self.agent_pos = agent_pos
-        self.agent_dir = int(self.np_random.integers(0, 4))
-
-        # Randomize seeker positions and place them in the grid
-        self.seeker_positions = []
-        self.seeker_objects = []
-        for _ in range(self.n_seekers):
-            pos = rand_pos()
-            seeker = Seeker()
-            self.seeker_objects.append(seeker)
-            self.seeker_positions.append(list(pos))
-            self.grid.set(*pos, seeker)
-
-
-    def gen_obs(self):
-        return {
-            'agent': np.array(self.agent_pos, dtype=np.int32),
-            'goal': np.array(self.goal_pos, dtype=np.int32),
-            'seekers': np.array(self.seeker_positions, dtype=np.int32),
-        }
-    
-    def reset(self, seed: Optional[int] = None, options: Optional[dict] = None):
-        obs, info = super().reset(seed=seed)
-        return obs, info
-
-    def _move_seekers(self):
-        """Move each seeker one step along the shortest (8-directional) path to
-        the agent, updating both the position list and the grid in-place."""
-        agent = np.array(self.agent_pos)
-        for idx, pos in enumerate(self.seeker_positions):
-            seeker_pos = np.array(pos)
-            diff = agent - seeker_pos
-
-            # Sign gives the unit step in each axis (-1, 0, or +1)
-            step = np.sign(diff)
-            new_pos = seeker_pos + step
-
-            new_x = int(np.clip(new_pos[0], 0, self.width - 1))
-            new_y = int(np.clip(new_pos[1], 0, self.height - 1))
-            old_x, old_y = int(seeker_pos[0]), int(seeker_pos[1])
-
-            # Nothing to do if position hasn't changed
-            if (old_x, old_y) == (new_x, new_y):
-                continue
-
-            # Only move to passable cells; explicitly skip the goal cell so
-            # seekers never overwrite it (Goal.can_overlap() is True in MiniGrid)
-            cell = self.grid.get(new_x, new_y)
-            target_is_goal = (new_x, new_y) == tuple(self.goal_pos)
-            if not target_is_goal and (cell is None or cell.can_overlap()):
-                # Update grid: restore old cell (put back goal if seeker was on it),
-                # then place seeker in new position
-                old_cell_was_goal = (old_x, old_y) == tuple(self.goal_pos)
-                self.grid.set(old_x, old_y, Goal() if old_cell_was_goal else None)
-                self.grid.set(new_x, new_y, self.seeker_objects[idx])
-                self.seeker_positions[idx] = [new_x, new_y]
-
-    def _seeker_caught_agent(self):
-        """Return True if any seeker occupies the same cell as the agent."""
-        for pos in self.seeker_positions:
-            if tuple(pos) == tuple(self.agent_pos):
-                return True
-        return False
-
-    def step(self, action):
-
-        if isinstance(action, np.ndarray):
-            action = int(action.item())
-
-        # Get movement direction
-        direction = self.action_map[action]
-
-        # Calculate new position
-        new_pos = (
-            self.agent_pos[0] + direction[0],
-            self.agent_pos[1] + direction[1]
-        )
-
-        # Clip to grid boundaries
-        new_pos = (
-            int(np.clip(new_pos[0], 0, self.width - 1)),
-            int(np.clip(new_pos[1], 0, self.height - 1))
-        )
-
-        prev_dist = np.linalg.norm(np.array(self.agent_pos) - np.array(self.goal_pos))
-
-        # Check if cell is passable (seekers have can_overlap=True, so agent can step on them)
-        cell = self.grid.get(*new_pos)
-        if cell is None or cell.can_overlap():
-            self.agent_pos = new_pos
-        
-        # Increment step counter
-        self.step_count += 1
-
-        # Move seekers toward the agent after the agent moves
-        self._move_seekers()
-
-        # Check if a seeker caught the agent
-        if self._seeker_caught_agent():
-            observation = self.gen_obs()
-            return observation, -100.0, True, False, {}
-
-        # Check if reached goal
-        if tuple(self.agent_pos) == self.goal_pos:
-            reward = 100.0
-            terminated = True
-        else:
-            curr_dist = np.linalg.norm(np.array(self.agent_pos) - np.array(self.goal_pos))
-            dist_reward = (prev_dist - curr_dist) * 0.5
-
-            # Proximity bonus using inverse distance so it spikes sharply when
-            # adjacent to the goal (~8.0 at dist=1), overwhelming any seeker-fear
-            # and preventing oscillation. Falls to ~0 beyond 5 cells.
-            if curr_dist < 5.0:
-                proximity_bonus = min(8.0, 8.0 / max(curr_dist, 0.5)) - 1.6
-            else:
-                proximity_bonus = 0.0
-
-            reward = -0.1 + dist_reward + proximity_bonus
-            terminated = False
-
-        # Check if max steps reached
-        truncated = self.step_count >= self.max_steps
-
-        observation = self.gen_obs()
-        return observation, reward, terminated, truncated, {}
