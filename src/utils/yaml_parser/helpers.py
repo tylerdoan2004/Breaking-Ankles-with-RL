@@ -13,6 +13,7 @@ from collections import deque
 from math import ceil
 from pathlib import Path
 from typing import Any, Optional
+from warnings import warn
 from utils.environment.coordinates import Coordinates
 from utils.environment.grid_dimensions import GridDimensions
 
@@ -337,22 +338,33 @@ def intersects(first_coordinates_list: list[Coordinates], second_coordinates_lis
     return not set(first_coordinates_list).isdisjoint(second_coordinates_list)
 
 
-def is_visibility_radius_within_grid_dimensions(visibility_radius: int, grid_dimensions: GridDimensions) -> bool:
+def does_agent_velocity_exceed_grid_dimensions(velocity: int, grid_dimensions: GridDimensions) -> bool:
     """
-    Checks if the visibility radius is within the grid dimensions.
+    Checks if the agent's velocity exceeds the grid dimensions.
     
-    :param visibility_radius: The visibility radius to check.
+    :param velocity: The agent's velocity to check.
     :param grid_dimensions: The grid dimensions.
-    :return: True if the visibility radius is within the grid dimensions, False otherwise.
+    :return: True if the agent's velocity exceeds the grid dimensions, False otherwise.
     """
-    return visibility_radius <= max(grid_dimensions.width, grid_dimensions.height)
+    return velocity > min(grid_dimensions.width, grid_dimensions.height)
 
 
-def minimum_moves_to_reach_goal(grid_dimensions: GridDimensions,
-                                start_coordinates: Coordinates, goal_coordinates: Coordinates,
-                                obstacles_coordinates: list[Coordinates]) -> Optional[int]:
+def does_agent_velocity_exceed_visibility_radius(velocity: int, visibility_radius: int) -> bool:
     """
-    Calculates the minimum number of moves from the agent's start coordinates to the agent's goal coordinates without colliding with obstacles. A move is a unit of motion in any of the cardinal or diagonal directions. A move differs from an action: an action consists of a sequence of moves of length velocity. This function implements the BFS algorithm.
+    Checks if the agent's velocity exceeds the agent's visibility radius.
+    
+    :param velocity: The agent's velocity to check.
+    :param visibility_radius: The agent's visibility radius.
+    :return: True if the agent's velocity exceeds the agent's visibility radius, False otherwise.
+    """
+    return velocity > visibility_radius
+
+
+def minimum_unit_moves_to_reach_goal(grid_dimensions: GridDimensions,
+                                     start_coordinates: Coordinates, goal_coordinates: Coordinates,
+                                     obstacles_coordinates: list[Coordinates]) -> Optional[int]:
+    """
+    Calculates the minimum number of unit moves from the agent's start coordinates to the agent's goal coordinates without colliding with obstacles. A unit move is a unit of motion in any of the cardinal or diagonal directions. This function implements the BFS algorithm.
     
     :param grid_dimensions: The grid dimensions.
     :param start_coordinates: The start coordinates.
@@ -390,6 +402,7 @@ def minimum_moves_to_reach_goal(grid_dimensions: GridDimensions,
     return None
 
 
+# TODO: Fix minimum time steps calculation
 def calculate_minimum_time_steps_to_reach_goal(minimum_moves: int, velocity: int) -> int:
     """
     Calculates the minimum number of time steps from the agent's start coordinates to the agent's goal coordinates without colliding with obstacles. A time step is a unit of time in the environment.
@@ -414,6 +427,7 @@ def is_episode_time_limit_sufficient(episode_time_limit: int, minimum_time_steps
     return episode_time_limit >= minimum_time_steps
 
 
+# TODO: Fix episode time limit validation
 def validate_system_configuration(system_configuration: SystemConfiguration) -> None:
     """
     Validates the system configuration.
@@ -447,13 +461,17 @@ def validate_system_configuration(system_configuration: SystemConfiguration) -> 
         raise ValueError(f"The agent's start coordinates intersect with a seeker's start coordinates: {system_configuration.agent.start_coordinates}")
     if intersects([system_configuration.agent.goal_coordinates], system_configuration.environment.obstacles_coordinates):
         raise ValueError(f"The agent's goal coordinates intersect with an obstacle: {system_configuration.agent.goal_coordinates}")
-    # TODO: Determine if the agent's goal coordinates can intersect with a seeker's start coordinates
-    # if intersects([system_configuration.agent.goal_coordinates], seekers_start_coordinates):
-    #     raise ValueError(f"The agent's goal coordinates intersect with a seeker's start coordinates: {system_configuration.agent.goal_coordinates}")
+    if intersects([system_configuration.agent.goal_coordinates], seekers_start_coordinates):
+        raise ValueError(f"The agent's goal coordinates intersect with a seeker's start coordinates: {system_configuration.agent.goal_coordinates}")
     if intersects(seekers_start_coordinates, system_configuration.environment.obstacles_coordinates):
         raise ValueError(f"The seekers' start coordinates intersect with an obstacle: {seekers_start_coordinates}")
 
-    minimum_moves = minimum_moves_to_reach_goal(grid_dimensions,
+    if does_agent_velocity_exceed_grid_dimensions(system_configuration.agent.velocity, grid_dimensions):
+        raise ValueError(f"The agent's velocity exceeds the grid dimensions: {system_configuration.agent.velocity}")
+    if does_agent_velocity_exceed_visibility_radius(system_configuration.agent.velocity, system_configuration.agent.visibility_radius):
+        warn(f"The agent's velocity exceeds the agent's visibility radius: {system_configuration.agent.velocity}", RuntimeWarning)
+
+    minimum_moves = minimum_unit_moves_to_reach_goal(grid_dimensions,
                                                 system_configuration.agent.start_coordinates, system_configuration.agent.goal_coordinates,
                                                 system_configuration.environment.obstacles_coordinates)
     if minimum_moves is None:
@@ -462,6 +480,3 @@ def validate_system_configuration(system_configuration: SystemConfiguration) -> 
     minimum_time_steps_to_reach_goal = calculate_minimum_time_steps_to_reach_goal(minimum_moves, system_configuration.agent.velocity)
     if not is_episode_time_limit_sufficient(system_configuration.environment.episode_time_limit, minimum_time_steps_to_reach_goal):
         raise ValueError(f"The agent cannot reach the goal coordinates within the episode time limit: {system_configuration.environment.episode_time_limit}")
-
-    if not is_visibility_radius_within_grid_dimensions(system_configuration.agent.visibility_radius, grid_dimensions):
-        raise ValueError(f"The agent's visibility radius exceeds the grid dimensions: {system_configuration.agent.visibility_radius}")
