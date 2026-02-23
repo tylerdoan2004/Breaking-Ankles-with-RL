@@ -3,6 +3,7 @@ This module provides the Coordinates class for representing coordinates in a two
 """
 from dataclasses import dataclass
 from types import NotImplementedType
+from typing import overload
 from utils.environment.vector import Vector
 
 @dataclass(frozen = True)
@@ -42,6 +43,14 @@ class Coordinates:
         :return: A new Coordinates object representing the component-wise sum of the coordinates with the vector or NotImplemented.
         """
         return self + other
+
+    @overload
+    def __sub__(self, other: Vector) -> "Coordinates":
+        ...
+
+    @overload
+    def __sub__(self, other: "Coordinates") -> Vector:
+        ...
 
     def __sub__(self, other: object) -> "Coordinates | Vector":
         """
