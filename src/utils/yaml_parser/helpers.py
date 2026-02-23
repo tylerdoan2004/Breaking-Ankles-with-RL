@@ -64,7 +64,7 @@ def is_config_version_valid(version: int) -> bool:
     :param version: The version to check.
     :return: True if the version is valid, False otherwise.
     """
-    return version == 1
+    return isinstance(version, int) and version == 1
 
 
 def is_system_config_shallowly_valid(data: Any) -> bool:
@@ -78,7 +78,7 @@ def is_system_config_shallowly_valid(data: Any) -> bool:
         return False
     if set(data.keys()) != {"version", "agent", "seekers", "environment"}:
         return False
-    if not isinstance(data["version"], int) or not is_config_version_valid(data["version"]):
+    if not is_config_version_valid(data["version"]):
         return False
     return True
 
@@ -90,7 +90,7 @@ def is_velocity_valid(velocity: int) -> bool:
     :param velocity: The velocity to check.
     :return: True if the velocity is valid, False otherwise.
     """
-    return velocity > 0
+    return isinstance(velocity, int) and velocity > 0
 
 
 def is_visibility_radius_valid(visibility_radius: int) -> bool:
@@ -100,7 +100,7 @@ def is_visibility_radius_valid(visibility_radius: int) -> bool:
     :param visibility_radius: The visibility radius to check.
     :return: True if the visibility radius is valid, False otherwise.
     """
-    return visibility_radius > 0
+    return isinstance(visibility_radius, int) and visibility_radius > 0
 
 
 def is_observation_stack_depth_valid(observation_stack_depth: int) -> bool:
@@ -110,8 +110,8 @@ def is_observation_stack_depth_valid(observation_stack_depth: int) -> bool:
     :param observation_stack_depth: The observation stack depth to check.
     :return: True if the observation stack depth is valid, False otherwise.
     """
-    # The observation stack includes the current observation
-    return observation_stack_depth > 0
+    # The observation stack includes the current observation; thus, the observation stack depth must be at least 1
+    return isinstance(observation_stack_depth, int) and observation_stack_depth > 0
 
 
 def is_agent_config_shallowly_valid(data: Any) -> bool:
@@ -125,11 +125,11 @@ def is_agent_config_shallowly_valid(data: Any) -> bool:
         return False
     if set(data.keys()) != {"start_coordinates", "goal_coordinates", "velocity", "visibility_radius", "observation_stack_depth"}:
         return False
-    if not isinstance(data["velocity"], int) or not is_velocity_valid(data["velocity"]):
+    if not is_velocity_valid(data["velocity"]):
         return False
-    if not isinstance(data["visibility_radius"], int) or not is_visibility_radius_valid(data["visibility_radius"]):
+    if not is_visibility_radius_valid(data["visibility_radius"]):
         return False
-    if not isinstance(data["observation_stack_depth"], int) or not is_observation_stack_depth_valid(data["observation_stack_depth"]):
+    if not is_observation_stack_depth_valid(data["observation_stack_depth"]):
         return False
     return True
 
@@ -171,7 +171,7 @@ def is_seeker_config_shallowly_valid(data: Any) -> bool:
         return False
     if set(data.keys()) != {"start_coordinates", "velocity"}:
         return False
-    if not isinstance(data["velocity"], int) or not is_velocity_valid(data["velocity"]):
+    if not is_velocity_valid(data["velocity"]):
         return False
     return True
 
@@ -199,7 +199,7 @@ def is_episode_time_limit_valid(episode_time_limit: int) -> bool:
     :param episode_time_limit: The episode time limit to check.
     :return: True if the episode time limit is valid, False otherwise.
     """
-    return episode_time_limit > 0
+    return isinstance(episode_time_limit, int) and episode_time_limit > 0
 
 
 def is_dimension_size_valid(dimension_size: int) -> bool:
@@ -253,7 +253,7 @@ def is_environment_config_shallowly_valid(data: Any) -> bool:
         return False
     if set(data.keys()) != {"grid_dimensions", "obstacles_coordinates", "episode_time_limit"}:
         return False
-    if not isinstance(data["episode_time_limit"], int) or not is_episode_time_limit_valid(data["episode_time_limit"]):
+    if not is_episode_time_limit_valid(data["episode_time_limit"]):
         return False
     return True
 
