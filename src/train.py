@@ -1,9 +1,12 @@
-from environment import RLEnvironment
+from pathlib import Path
 from stable_baselines3 import PPO
 from stable_baselines3.common.env_checker import check_env
+from src.environment import ReactiveAvoidanceEnv
+from src.utils.yaml_parser.configuration import SystemConfiguration
 
 # Creates the environment and validates it
-train_env = RLEnvironment(render_mode=None)
+train_yaml_file = Path("config/default.yaml")
+train_env = ReactiveAvoidanceEnv(config = SystemConfiguration.parse_config_file(train_yaml_file), render_mode = None)
 print("Checking environment...")
 check_env(train_env)
 print("Environment check passed!")
