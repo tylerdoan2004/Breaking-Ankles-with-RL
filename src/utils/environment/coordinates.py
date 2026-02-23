@@ -6,6 +6,7 @@ from types import NotImplementedType
 from typing import overload
 from utils.environment.vector import Vector
 
+
 @dataclass(frozen = True)
 class Coordinates:
     """

@@ -23,7 +23,6 @@ class GridDimensions:
         """
         return GridDimensions(grid_dimensions[0], grid_dimensions[1])
 
-
     def contains_coordinates(self, coordinates: Coordinates) -> bool:
         """
         Checks if the coordinates are within the grid dimensions.
