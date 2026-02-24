@@ -16,5 +16,5 @@ title:  Team
 
 ## Aston Chan
 ***UCI Net ID***: kic2
-[LinkedIn](https://www.linkedin.com/in/aston-chan/6)
+[LinkedIn](https://www.linkedin.com/in/aston-chan/)
 
