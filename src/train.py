@@ -10,7 +10,7 @@ print("Environment check passed!")
 
 # Creates the model and trains it using the environment
 model = PPO("MultiInputPolicy", train_env, verbose=1)
-model.learn(total_timesteps=100000)
+model.learn(total_timesteps=1000000)
 print("Training complete!")
 
 # Saves the trained model
