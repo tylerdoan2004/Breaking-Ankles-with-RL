@@ -1,7 +1,6 @@
 """
 This module provides the ReactiveAvoidanceEnvironment class for representing a two-dimensional gridworld environment where an agent traverses from some start coordinates to some goal coordinates while avoiding static obstacles and one or more seekers.
 """
-from gymnasium.core import ActType
 import numpy as np
 from collections import deque
 from typing import Any, cast, Optional
@@ -65,7 +64,7 @@ class ReactiveAvoidanceEnv(MiniGridEnv):
 
     def _compute_local_observation(self) -> np.ndarray:
         """
-        Computes the local observation for the current environment state. For each cell within the agent's visibility radius, the local observation includes whether the agent observes an obstacle, whether the agent observes a seeker, and whether the agent observes the goal.
+        Computes the agent's local observation for the current environment state. For each cell within the agent's visibility radius, the local observation includes whether the agent observes an obstacle, whether the agent observes a seeker, and whether the agent observes the goal.
         
         :return: The local observation for the current environment state.
         """
@@ -234,6 +233,19 @@ class ReactiveAvoidanceEnv(MiniGridEnv):
         self.grid.set(current_coordinates.x, current_coordinates.y, Seeker())
         return current_coordinates
 
+    def _finalize_step(self, *, reward: float, terminated: bool, truncated: bool, outcome: Optional[str]) -> tuple[np.ndarray, float, bool, bool, dict[str, Any]]:
+        """
+        Finalizes the step in the environment. Computes and appends the agent's local observation to the local observation history. Returns a tuple containing the observation, reward, termination flag, truncation flag, and auxiliary info dictionary.
+        
+        :param reward: The agent's reward for the step.
+        :param terminated: The termination flag for the episode.
+        :param truncated: The truncation flag for the episode.
+        :param outcome: The outcome of the episode.
+        :return: A tuple containing the observation, reward, termination flag, truncation flag, and auxiliary info dictionary.
+        """
+        self._current_local_observation_history.append(self._compute_local_observation())
+        return self._get_obs(), reward, terminated, truncated, self._get_info(outcome = outcome)
+
     def step(self, action: object) -> tuple[np.ndarray, float, bool, bool, dict[str, Any]]:
         """
         Performs a single step in the environment.
@@ -250,24 +262,24 @@ class ReactiveAvoidanceEnv(MiniGridEnv):
 
         truncated = self._current_step >= self.config.environment.episode_time_limit
 
+        # If moving the agent results in a collision, return the current observation and terminate the episode
         if not self._can_agent_be_in(self._current_agent_coordinates):
-            self._current_local_observation_history.append(self._compute_local_observation())
-            return self._get_obs(), -1.0, True, truncated, self._get_info(outcome = "collision")
+            return self._finalize_step(reward = -1.0, terminated = True, truncated = truncated, outcome = "collision")
 
+        # If moving the agent results in reaching the goal, return the current observation and terminate the episode
         if self._current_agent_coordinates == self.config.agent.goal_coordinates:
-            self._current_local_observation_history.append(self._compute_local_observation())
-            return self._get_obs(), 1.0, True, truncated, self._get_info(outcome = "goal")
+            return self._finalize_step(reward = 1.0, terminated = True, truncated = truncated, outcome = "goal")
 
         # Move the seekers
         for i, seeker in enumerate(self.config.seekers):
             self._current_seeker_coordinates[i] = self._move_seeker(self._current_seeker_coordinates[i], seeker.velocity)
 
+        # If moving the seekers results in an interception, return the current observation and terminate the episode
         if self._current_agent_coordinates in self._current_seeker_coordinates:
-            self._current_local_observation_history.append(self._compute_local_observation())
-            return self._get_obs(), -1.0, True, truncated, self._get_info(outcome = "interception")
+            return self._finalize_step(reward = -1.0, terminated = True, truncated = truncated, outcome = "interception")
 
-        self._current_local_observation_history.append(self._compute_local_observation())
-        return self._get_obs(), -1 / self.config.environment.episode_time_limit, False, truncated, self._get_info(outcome = "timeout" if truncated else None)
+        # Otherwise, continue the episode
+        return self._finalize_step(reward = -1 / self.config.environment.episode_time_limit, terminated = False, truncated = truncated, outcome = "timeout" if truncated else None)
 
     # def step(self, action):
 
