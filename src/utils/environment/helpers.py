@@ -2,9 +2,13 @@
 This module provides helper functions for the reactive avoidance environment.
 """
 import numpy as np
+from pathlib import Path
+from typing import Optional
 from gymnasium.spaces import Box
+from src.environment import ReactiveAvoidanceEnv
 from utils.environment.coordinates import Coordinates
 from utils.environment.vector import Vector
+from utils.yaml_parser.configuration import SystemConfiguration
 
 
 def calculate_observation_space(visibility_radius: int, observation_stack_depth: int) -> Box:
@@ -29,6 +33,7 @@ def calculate_observation_space(visibility_radius: int, observation_stack_depth:
     observation_dimensions = current_observation_dimensions + observation_stack_dimensions
     return Box(low = -1, high = 1, shape = (observation_dimensions,), dtype = np.float32)
 
+
 def scale_absolute_coordinates(coordinates: Coordinates, grid_width: int, grid_height: int) -> np.ndarray:
     """
     Scales absolute coordinates in a two-dimensional gridworld to a range of [-1, 1].
@@ -42,6 +47,7 @@ def scale_absolute_coordinates(coordinates: Coordinates, grid_width: int, grid_h
     scaled_y_coordinate = 2.0 * (coordinates.y / max(1, grid_height - 1)) - 1.0
     return np.array([scaled_x_coordinate, scaled_y_coordinate], dtype = np.float32)
 
+
 def scale_relative_vector(vector: Vector, grid_width: int, grid_height: int) -> np.ndarray:
     """
     Scales a relative vector in a two-dimensional gridworld to a range of [-1, 1].
@@ -54,3 +60,16 @@ def scale_relative_vector(vector: Vector, grid_width: int, grid_height: int) -> 
     scaled_x_component = vector.x / max(1, grid_width - 1)
     scaled_y_component = vector.y / max(1, grid_height - 1)
     return np.array([scaled_x_component, scaled_y_component], dtype = np.float32)
+
+
+def make_env_from_yaml(yaml_file_path: str, *, render_mode: Optional[str] = None) -> ReactiveAvoidanceEnv:
+    """
+    Makes a reactive avoidance environment from a YAML file.
+    
+    :param yaml_file_path: The path to the YAML file.
+    :param render_mode: The rendering mode for the environment.
+    :return: The reactive avoidance environment.
+    """
+    config = SystemConfiguration.parse_config_file(Path(yaml_file_path))
+    environment = ReactiveAvoidanceEnv(config, render_mode)
+    return environment
