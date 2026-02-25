@@ -6,9 +6,9 @@ from pathlib import Path
 from typing import Optional
 from gymnasium.spaces import Box
 from src.environment import ReactiveAvoidanceEnv
-from utils.environment.coordinates import Coordinates
-from utils.environment.vector import Vector
-from utils.yaml_parser.configuration import SystemConfiguration
+from src.utils.environment.coordinates import Coordinates
+from src.utils.environment.vector import Vector
+from src.utils.yaml_parser.configuration import SystemConfiguration
 
 
 def calculate_observation_space(visibility_radius: int, observation_stack_depth: int) -> Box:

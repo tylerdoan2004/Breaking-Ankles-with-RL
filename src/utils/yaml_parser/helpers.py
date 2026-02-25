@@ -14,8 +14,8 @@ from math import ceil
 from pathlib import Path
 from typing import Any, Optional
 from warnings import warn
-from utils.environment.coordinates import Coordinates
-from utils.environment.grid_dimensions import GridDimensions
+from src.utils.environment.coordinates import Coordinates
+from src.utils.environment.grid_dimensions import GridDimensions
 
 
 USAGE_STRING = "Usage: python3 main.py [CONFIG_FILE].yaml"

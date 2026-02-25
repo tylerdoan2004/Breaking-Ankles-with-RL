@@ -2,7 +2,7 @@
 This module provides the GridDimensions class for representing the dimensions of a two-dimensional gridworld.
 """
 from dataclasses import dataclass
-from utils.environment.coordinates import Coordinates
+from src.utils.environment.coordinates import Coordinates
 
 
 @dataclass(frozen = True)

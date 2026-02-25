@@ -10,11 +10,10 @@ from minigrid.core.mission import MissionSpace
 from minigrid.core.world_object import Goal, Wall
 from minigrid.minigrid_env import MiniGridEnv
 from src.utils.environment.coordinates import Coordinates
-from src.utils.environment.helpers import scale_absolute_coordinates, scale_relative_vector
+from src.utils.environment.helpers import calculate_observation_space, scale_absolute_coordinates, scale_relative_vector
+from src.utils.environment.seeker import Seeker
 from src.utils.environment.vector import Vector
-from utils.environment.seeker import Seeker
-from utils.environment.helpers import calculate_observation_space
-from utils.yaml_parser.configuration import SystemConfiguration
+from src.utils.yaml_parser.configuration import SystemConfiguration
 
 
 class ReactiveAvoidanceEnv(MiniGridEnv):

@@ -4,7 +4,7 @@ This module provides the Coordinates class for representing coordinates in a two
 from dataclasses import dataclass
 from types import NotImplementedType
 from typing import overload
-from utils.environment.vector import Vector
+from src.utils.environment.vector import Vector
 
 
 @dataclass(frozen = True)

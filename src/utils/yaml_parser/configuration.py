@@ -3,7 +3,7 @@ This module provides the SystemConfiguration, AgentConfiguration, SeekerConfigur
 """
 from dataclasses import dataclass
 from pathlib import Path
-from utils.yaml_parser.helpers import (
+from src.utils.yaml_parser.helpers import (
     is_agent_config_shallowly_valid,
     is_coordinates_data_valid,
     is_environment_config_shallowly_valid,
@@ -15,8 +15,8 @@ from utils.yaml_parser.helpers import (
     load_yaml_file,
     validate_system_configuration
 )
-from utils.environment.coordinates import Coordinates
-from utils.environment.grid_dimensions import GridDimensions
+from src.utils.environment.coordinates import Coordinates
+from src.utils.environment.grid_dimensions import GridDimensions
 
 
 __all__ = ["SystemConfiguration", "AgentConfiguration", "SeekerConfiguration", "EnvironmentConfiguration"]
