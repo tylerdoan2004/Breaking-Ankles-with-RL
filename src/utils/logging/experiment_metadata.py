@@ -5,7 +5,7 @@ import yaml
 from dataclasses import asdict, dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import Any, TypedDict
+from typing import Any, Optional, TypedDict
 
 
 ConfigPaths = TypedDict(
@@ -29,6 +29,7 @@ class ExperimentMetadata:
     seed: int
     model_hyperparameters: dict[str, Any]
     config_paths: ConfigPaths
+    runtime_environment_information: dict[str, Optional[str]]
 
     def to_dict(self) -> dict[str, Any]:
         """

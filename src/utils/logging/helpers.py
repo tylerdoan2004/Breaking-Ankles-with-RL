@@ -1,6 +1,42 @@
+import importlib
+import importlib.metadata
+import platform
 import shutil
+import sys
 from pathlib import Path
+from typing import Optional
 from src.utils.logging.experiment_metadata import ExperimentMetadata
+
+
+def get_package_version(package_name: str) -> Optional[str]:
+    """
+    Returns the installed version of a package, or None if the package is not installed.
+    
+    :param package_name: The name of the package to get the version of.
+    :return: The installed version of a package, or None if the package is not installed.
+    """
+    try:
+        return importlib.metadata.version(package_name)
+    except importlib.metadata.PackageNotFoundError:
+        return None
+
+
+def get_runtime_environment_information() -> dict[str, Optional[str]]:
+    """
+    Returns information about the runtime environment relevant to the experiment.
+    
+    :return: A dictionary containing information about the runtime environment relevant to the experiment.
+    """
+    return {
+        "platform": platform.platform(),
+        "python": sys.version,
+        "python_implementation": platform.python_implementation(),
+        "gymnasium": get_package_version("gymnasium"),
+        "minigrid": get_package_version("minigrid"),
+        "numpy": get_package_version("numpy"),
+        "pyyaml": get_package_version("pyyaml"),
+        "stable_baselines3": get_package_version("stable_baselines3"),
+    }
 
 
 def initialize_logging_directories(*, logging_directory: str, experiment_metadata: ExperimentMetadata) -> None:
