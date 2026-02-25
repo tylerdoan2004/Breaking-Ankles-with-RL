@@ -6,7 +6,7 @@ from datetime import datetime
 from pathlib import Path
 
 
-@dataclass(frozen = True)
+@dataclass(frozen = True, kw_only = True)
 class ExperimentMetadata:
     """
     A class for representing metadata about an experiment.
