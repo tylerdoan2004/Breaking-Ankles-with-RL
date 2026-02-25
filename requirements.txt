@@ -3,6 +3,7 @@ gymnasium
 minigrid
 numpy
 pyyaml
+torch
 
 # RL algorithm dependencies
 stable_baselines3
