@@ -4,6 +4,9 @@ import shutil
 import sys
 import torch
 from pathlib import Path
+from typing import Any, Literal, Optional, Protocol, TypeVar
+from gymnasium import Env
+from gymnasium.wrappers import RecordVideo
 from src.utils.logging.experiment_metadata import ExperimentMetadata, HardwareMetadata, PackageMetadata, PythonMetadata, RuntimeMetadata, SoftwareMetadata
 
 
@@ -48,13 +51,13 @@ def get_runtime_metadata() -> RuntimeMetadata:
     )
 
 
-def initialize_logging_directories(*, logging_directory: str, experiment_metadata: ExperimentMetadata) -> None:
+def initialize_logging_directories(*, logging_directory: str, experiment_metadata: ExperimentMetadata) -> Path:
     """
     Sets up the logging directories for the experiment.
     
     :param logging_directory: The directory used to store experiment logs.
     :param experiment_metadata: The metadata for the experiment.
-    :return: None.
+    :return: The path to the logging directory for the experiment.
     """
     SUBDIRECTORIES = {
         "metadata",
@@ -98,3 +101,70 @@ def initialize_logging_directories(*, logging_directory: str, experiment_metadat
 
     # Write experiment metadata to experiment directory
     experiment_metadata.to_yaml(experiment_directory / "metadata/experiment_metadata.yaml")
+    return experiment_directory
+
+
+EnvTypeCovariant = TypeVar("EnvTypeCovariant", bound = Env, covariant = True)
+class VideoRecordableEnvironmentFactory(Protocol[EnvTypeCovariant]):
+    """
+    A protocol for creating video recordable environments.
+    """
+    def __call__(self, *args: Any, render_mode: Literal["rgb_array"], **kwargs: Any) -> EnvTypeCovariant:
+        """
+        Creates a video recordable environment.
+        
+        :param render_mode: The render mode to use for the environment.
+        :return: A video recordable environment.
+        """
+        ...
+
+
+ObsTypeContravariant = TypeVar("ObsTypeContravariant", contravariant = True)
+ActTypeCovariant = TypeVar("ActTypeCovariant", covariant = True)
+class Agent(Protocol[ObsTypeContravariant, ActTypeCovariant]):
+    """
+    A protocol for representing an agent.
+    """
+    def predict(self, observation: ObsTypeContravariant, *, deterministic: bool = True) -> ActTypeCovariant:
+        """
+        Predicts an action given an observation.
+        
+        :param observation: The observation used to predict the next action.
+        :param deterministic: Whether the agent predicts actions deterministically.
+        :return: The predicted action.
+        """
+        ...
+
+
+O = TypeVar("O")
+A = TypeVar("A")
+def record_video_single_episode(*,
+                                video_directory: str, video_name_prefix: str,
+                                environment_factory: VideoRecordableEnvironmentFactory[Env[O, A]],
+                                agent: Optional[Agent[O, A]] = None, deterministic: bool = True) -> None:
+    """
+    Records a video of a single episode of an agent performing actions in an environment.
+    
+    :param video_directory: The directory used to store the video.
+    :param video_name_prefix: The prefix used to name the video.
+    :param environment_factory: A function that creates a video recordable environment.
+    :param agent: The agent to record the video for.
+    :param deterministic: Whether the agent predicts actions deterministically.
+    :return: None.
+    """
+    environment = environment_factory(render_mode = "rgb_array")
+    environment = RecordVideo(
+        env = environment,
+        video_folder = video_directory,
+        episode_trigger = lambda episode: episode == 0,
+        name_prefix = video_name_prefix
+    )
+
+    observation, _ = environment.reset()
+    done = False
+    while not done:
+        action = agent.predict(observation, deterministic = deterministic) if agent is not None else environment.action_space.sample()
+        observation, _, terminated, truncated, _ = environment.step(action)
+        done = terminated or truncated
+
+    environment.close()
