@@ -16,4 +16,4 @@ class ExperimentMetadata:
     timestamp: datetime
     seed: int
     model_hyperparameters: dict
-    config_paths: dict[str, Path]
+    config_paths: dict[str, str]
