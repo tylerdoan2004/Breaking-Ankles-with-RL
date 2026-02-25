@@ -1,42 +1,51 @@
-import importlib
 import importlib.metadata
 import platform
 import shutil
 import sys
+import torch
 from pathlib import Path
-from typing import Optional
-from src.utils.logging.experiment_metadata import ExperimentMetadata
+from src.utils.logging.experiment_metadata import ExperimentMetadata, HardwareMetadata, PackageMetadata, PythonMetadata, RuntimeMetadata, SoftwareMetadata
 
 
-def get_package_version(package_name: str) -> Optional[str]:
+def get_package_metadata(package_name: str) -> PackageMetadata:
     """
-    Returns the installed version of a package, or None if the package is not installed.
+    Returns metadata about a package.
     
-    :param package_name: The name of the package to get the version of.
-    :return: The installed version of a package, or None if the package is not installed.
+    :param package_name: The name of the package to get metadata about.
+    :return: Metadata about a package.
     """
     try:
-        return importlib.metadata.version(package_name)
+        version = importlib.metadata.version(package_name)
     except importlib.metadata.PackageNotFoundError:
-        return None
+        version = None
+    return PackageMetadata(version = version)
 
 
-def get_runtime_environment_information() -> dict[str, Optional[str]]:
+def get_runtime_metadata() -> RuntimeMetadata:
     """
-    Returns information about the runtime environment relevant to the experiment.
+    Returns metadata about the runtime environment of the experiment.
     
-    :return: A dictionary containing information about the runtime environment relevant to the experiment.
+    :return: Metadata about the runtime environment of the experiment.
     """
-    return {
-        "platform": platform.platform(),
-        "python": sys.version,
-        "python_implementation": platform.python_implementation(),
-        "gymnasium": get_package_version("gymnasium"),
-        "minigrid": get_package_version("minigrid"),
-        "numpy": get_package_version("numpy"),
-        "pyyaml": get_package_version("pyyaml"),
-        "stable_baselines3": get_package_version("stable_baselines3"),
-    }
+    hardware = HardwareMetadata(
+        platform = platform.platform(),
+        device = "cuda" if torch.cuda.is_available() else "cpu"
+    )
+    software = SoftwareMetadata(
+        python = PythonMetadata(
+            implementation = platform.python_implementation(),
+            version = sys.version
+        ),
+        gymnasium = get_package_metadata("gymnasium"),
+        minigrid = get_package_metadata("minigrid"),
+        numpy = get_package_metadata("numpy"),
+        pyyaml = get_package_metadata("PyYAML"),
+        stable_baselines3 = get_package_metadata("stable-baselines3")
+    )
+    return RuntimeMetadata(
+        hardware = hardware,
+        software = software
+    )
 
 
 def initialize_logging_directories(*, logging_directory: str, experiment_metadata: ExperimentMetadata) -> None:
@@ -76,16 +85,16 @@ def initialize_logging_directories(*, logging_directory: str, experiment_metadat
         "evaluation/out_of_distribution/videos/posttraining",
     }
 
-    experiment_directory = Path(logging_directory) / experiment_metadata.experiment_name / experiment_metadata.model_name / experiment_metadata.timestamp.strftime("%Y-%m-%d-%H-%M-%S")
+    experiment_directory = Path(logging_directory) / experiment_metadata.experiment_name / experiment_metadata.model.name / experiment_metadata.timestamp.strftime("%Y-%m-%d-%H-%M-%S-%f")
     experiment_directory.mkdir(parents = True, exist_ok = True)
 
     for subdirectory in SUBDIRECTORIES:
         (experiment_directory / subdirectory).mkdir(parents = True, exist_ok = True)
 
     # Copy experiment configs to experiment directory
-    shutil.copyfile(experiment_metadata.config_paths["training"], experiment_directory / "metadata/configs/training/training.yaml")
-    shutil.copyfile(experiment_metadata.config_paths["evaluation/in_distribution"], experiment_directory / "metadata/configs/evaluation/in_distribution.yaml")
-    shutil.copyfile(experiment_metadata.config_paths["evaluation/out_of_distribution"], experiment_directory / "metadata/configs/evaluation/out_of_distribution.yaml")
+    shutil.copyfile(experiment_metadata.system_configurations.training.path, experiment_directory / "metadata/configs/training/training.yaml")
+    shutil.copyfile(experiment_metadata.system_configurations.evaluation.in_distribution.path, experiment_directory / "metadata/configs/evaluation/in_distribution.yaml")
+    shutil.copyfile(experiment_metadata.system_configurations.evaluation.out_of_distribution.path, experiment_directory / "metadata/configs/evaluation/out_of_distribution.yaml")
 
     # Write experiment metadata to experiment directory
     experiment_metadata.to_yaml(experiment_directory / "metadata/experiment_metadata.yaml")
