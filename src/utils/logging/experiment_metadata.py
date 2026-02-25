@@ -4,6 +4,7 @@ This module provides the ExperimentMetadata class for representing metadata abou
 import yaml
 from dataclasses import asdict, dataclass
 from datetime import datetime
+from pathlib import Path
 from typing import Any, TypedDict
 
 
@@ -39,7 +40,7 @@ class ExperimentMetadata:
         data["timestamp"] = data["timestamp"].isoformat()
         return data
 
-    def to_yaml(self, file_path: str) -> None:
+    def to_yaml(self, file_path: str | Path) -> None:
         """
         Writes the ExperimentMetadata object to a YAML file.
 
