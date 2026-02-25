@@ -1,7 +1,11 @@
+# RL environment dependencies
 gymnasium
-matplotlib
-numpy
 minigrid
-stable_baselines3
-pygame
+numpy
 pyyaml
+
+# RL algorithm dependencies
+stable_baselines3
+
+# Visualization dependencies
+matplotlib
