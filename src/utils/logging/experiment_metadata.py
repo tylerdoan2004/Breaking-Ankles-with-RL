@@ -119,7 +119,8 @@ class LoggingMetadata:
     verbose: int
     rolling_window_size: int
     num_checkpoints: int
-    num_evaluations: int
+    num_validation_evaluations: int
+    episodes_per_validation_evaluation: int
     episodes_per_evaluation: int
     num_videos: int
 
