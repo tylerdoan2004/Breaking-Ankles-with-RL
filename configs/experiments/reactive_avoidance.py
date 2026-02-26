@@ -58,12 +58,14 @@ TRAINING_METADATA = TrainingMetadata(
     total_timesteps = 2_000_000
 )
 LOGGING_METADATA = LoggingMetadata(
-    verbose = 0,
-    rolling_window_size = 100,
-    num_checkpoints = 25,
-    num_videos = 10,
     logging_directories = LoggingDirectoriesMetadata(
         base = LOGGING_DIRECTORY,
         tensorboard = "training/metrics/tensorboard"
-    )
+    ),
+    verbose = 0,
+    rolling_window_size = 100,
+    num_checkpoints = 25,
+    num_evaluations = 25,
+    episodes_per_evaluation = 25,
+    num_videos = 10,
 )
