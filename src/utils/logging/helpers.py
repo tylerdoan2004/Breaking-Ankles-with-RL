@@ -2,6 +2,7 @@ import importlib.metadata
 import platform
 import shutil
 import sys
+import numpy as np
 import torch
 from pathlib import Path
 from typing import cast, Optional
@@ -124,15 +125,17 @@ def record_video_single_episode(*,
             episode_trigger = lambda episode: episode == 0,
             name_prefix = video_name_prefix
         )
-
         observation, _ = environment.reset(seed = seed)
         done = False
         while not done:
+            action: object
             if agent is None:
                 action = environment.action_space.sample()
             else:
                 action = agent.predict(observation, deterministic = deterministic)
-            observation, _, terminated, truncated, _ = environment.step(action)
+            if isinstance(action, np.ndarray) and action.size == 1:
+                action = action.item()
+            observation, _, terminated, truncated, _ = environment.step(cast(ActType, action))
             done = terminated or truncated
     finally:
         environment.close()
