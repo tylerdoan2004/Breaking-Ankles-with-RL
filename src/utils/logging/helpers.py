@@ -66,6 +66,7 @@ def initialize_logging_directories(*, logging_directory: str, experiment_metadat
         "metadata",
         "metadata/configs",
         "metadata/configs/training",
+        "metadata/configs/validation",
         "metadata/configs/evaluation",
         "models",
         "models/checkpoints",
@@ -95,6 +96,7 @@ def initialize_logging_directories(*, logging_directory: str, experiment_metadat
 
     # Copy experiment configs to experiment directory
     shutil.copyfile(experiment_metadata.system_configurations.training.path, experiment_directory / "metadata/configs/training/training.yaml")
+    shutil.copyfile(experiment_metadata.system_configurations.validation.path, experiment_directory / "metadata/configs/validation/validation.yaml")
     shutil.copyfile(experiment_metadata.system_configurations.evaluation.in_distribution.path, experiment_directory / "metadata/configs/evaluation/in_distribution.yaml")
     shutil.copyfile(experiment_metadata.system_configurations.evaluation.out_of_distribution.path, experiment_directory / "metadata/configs/evaluation/out_of_distribution.yaml")
 
