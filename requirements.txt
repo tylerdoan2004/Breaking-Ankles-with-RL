@@ -1,13 +1,22 @@
 # RL environment dependencies
-gymnasium[other]
+gymnasium
 minigrid
 numpy
 pyyaml
 torch
 
 # RL algorithm dependencies
-stable_baselines3[extra]
+stable_baselines3
+
+# Training dependencies
+tqdm
+rich
 
 # Visualization dependencies
 matplotlib
 tensorboard
+
+# Video recording dependencies
+moviepy
+imageio
+imageio-ffmpeg
