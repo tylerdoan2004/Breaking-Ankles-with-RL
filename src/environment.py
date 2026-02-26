@@ -146,7 +146,10 @@ class ReactiveAvoidanceEnv(MiniGridEnv):
 
         # Place agent on the grid
         self.agent_pos = (self.config.agent.start_coordinates.x, self.config.agent.start_coordinates.y)
-    
+        # Set the agent's direction in the grid 
+        # NOTE: Required for the MiniGridEnv class
+        self.agent_dir = 0
+
         # Place goal on the grid
         self.grid.set(self.config.agent.goal_coordinates.x, self.config.agent.goal_coordinates.y, Goal())
     

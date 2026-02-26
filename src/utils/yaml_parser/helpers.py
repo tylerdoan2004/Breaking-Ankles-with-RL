@@ -428,6 +428,7 @@ def is_episode_time_limit_sufficient(episode_time_limit: int, minimum_time_steps
 
 
 # TODO: Fix episode time limit validation
+# TODO: Validate the location of the agent, seekers, obstacles, and goal with respect to the walls of the grid
 def validate_system_configuration(system_configuration: SystemConfiguration) -> None:
     """
     Validates the system configuration.
