@@ -73,19 +73,13 @@ def initialize_logging_directories(*, logging_directory: str, experiment_metadat
         "training",
         "training/metrics",
         "training/metrics/tensorboard",
-        "training/videos",
-        "training/videos/pretraining",
-        "training/videos/training",
-        "training/videos/posttraining",
         "validation",
         "validation/metrics",
         "evaluation",
         "evaluation/in_distribution",
         "evaluation/in_distribution/metrics",
-        "evaluation/in_distribution/videos",
         "evaluation/out_of_distribution",
         "evaluation/out_of_distribution/metrics",
-        "evaluation/out_of_distribution/videos"
     }
 
     experiment_directory = Path(logging_directory) / experiment_metadata.experiment_name / experiment_metadata.model.name / experiment_metadata.timestamp.strftime("%Y-%m-%d-%H-%M-%S-%f")
@@ -120,7 +114,6 @@ def record_video_single_episode(*,
     :param deterministic: Whether the agent predicts actions deterministically.
     :return: None.
     """
-    Path(video_directory).mkdir(parents = True, exist_ok = True)
     environment: Env[ObsType, ActType] = environment_factory(render_mode = "rgb_array")
     try:
         environment = RecordVideo(
