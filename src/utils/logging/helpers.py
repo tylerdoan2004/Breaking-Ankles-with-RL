@@ -76,6 +76,8 @@ def initialize_logging_directories(*, logging_directory: str, experiment_metadat
         "training/videos/pretraining",
         "training/videos/training",
         "training/videos/posttraining",
+        "validation",
+        "validation/metrics",
         "evaluation",
         "evaluation/in_distribution",
         "evaluation/in_distribution/metrics",
