@@ -6,7 +6,7 @@ pyyaml
 torch
 
 # RL algorithm dependencies
-stable_baselines3
+stable_baselines3[extra]
 
 # Visualization dependencies
 matplotlib
