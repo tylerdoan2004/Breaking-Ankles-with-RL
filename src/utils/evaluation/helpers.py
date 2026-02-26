@@ -44,4 +44,3 @@ def evaluate_agent(*, model: StableBaselines3Model, yaml_file_path: str, environ
     print(f"Number of episodes: {n_episodes}")
     print(f"Mean reward: {mean_reward:.3f}")
     print(f"Standard deviation: {std_reward:.3f}")
-
