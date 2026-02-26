@@ -47,6 +47,7 @@ class StableBaselines3Agent(Generic[ObsType, ActType]):
         Creates a StableBaselines3Agent object.
         
         :param model: The Stable Baselines 3 model used by the agent.
+        :return: None.
         """
         self.model = model
 

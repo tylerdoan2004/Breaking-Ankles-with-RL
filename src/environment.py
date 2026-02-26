@@ -28,6 +28,7 @@ class ReactiveAvoidanceEnv(MiniGridEnv):
         
         :param config: A SystemConfiguration object representing the configuration of the agent-seeker-gridworld system.
         :param render_mode: The rendering mode for the environment.
+        :return: None.
         """
         super().__init__(
             mission_space = MissionSpace(mission_func = lambda: "Traverse from some start coordinates to some goal coordinates while avoiding static obstacles and one or more seekers."),

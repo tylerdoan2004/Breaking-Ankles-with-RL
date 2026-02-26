@@ -11,6 +11,8 @@ class Seeker(Ball):
     def __init__(self) -> None:
         """
         Creates a Seeker object.
+        
+        :return: None.
         """
         super().__init__("red")
 
