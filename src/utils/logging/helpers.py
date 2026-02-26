@@ -102,7 +102,7 @@ def initialize_logging_directories(*, logging_directory: str, experiment_metadat
 
 def record_video_single_episode(*,
                                 video_directory: str, video_name_prefix: str,
-                                environment_factory: VideoRecordableEnvironmentFactory[Env[ObsType, ActType]],
+                                environment_factory: VideoRecordableEnvironmentFactory[Env[ObsType, ActType]], seed: int,
                                 agent: Optional[Agent[ObsType, ActType]] = None, deterministic: bool = True) -> None:
     """
     Records a video of a single episode of an agent performing actions in an environment.
@@ -110,30 +110,29 @@ def record_video_single_episode(*,
     :param video_directory: The directory used to store the video.
     :param video_name_prefix: The prefix used to name the video.
     :param environment_factory: A function that creates a video recordable environment.
+    :param seed: The seed to use for the environment.
     :param agent: The agent to record the video for.
     :param deterministic: Whether the agent predicts actions deterministically.
     :return: None.
     """
+    Path(video_directory).mkdir(parents = True, exist_ok = True)
     environment: Env[ObsType, ActType] = environment_factory(render_mode = "rgb_array")
-    environment = RecordVideo(
-        env = environment,
-        video_folder = video_directory,
-        episode_trigger = lambda episode: episode == 0,
-        name_prefix = video_name_prefix
-    )
-    environment = cast(
-        Env[ObsType, ActType],
-        environment
-    )
+    try:
+        environment = RecordVideo(
+            env = environment,
+            video_folder = video_directory,
+            episode_trigger = lambda episode: episode == 0,
+            name_prefix = video_name_prefix
+        )
 
-    observation, _ = environment.reset()
-    done = False
-    while not done:
-        if agent is None:
-            action = environment.action_space.sample()
-        else:
-            action = agent.predict(observation, deterministic = deterministic)
-        observation, _, terminated, truncated, _ = environment.step(action)
-        done = terminated or truncated
-
-    environment.close()
+        observation, _ = environment.reset(seed = seed)
+        done = False
+        while not done:
+            if agent is None:
+                action = environment.action_space.sample()
+            else:
+                action = agent.predict(observation, deterministic = deterministic)
+            observation, _, terminated, truncated, _ = environment.step(action)
+            done = terminated or truncated
+    finally:
+        environment.close()
