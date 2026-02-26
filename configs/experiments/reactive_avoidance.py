@@ -13,7 +13,7 @@ LOGGING_DIRECTORY = "logs"
 EXPERIMENT_NAME = "reactive_avoidance"
 SEED = 0
 MODEL = ModelMetadata(
-    name = "PPO",
+    name = "ppo",
     # NOTE: Default model hyperparameters obtained from https://stable-baselines3.readthedocs.io/en/master/modules/ppo.html
     hyperparameters = {
         "policy": "MlpPolicy",
@@ -41,6 +41,9 @@ SYSTEM_CONFIGURATIONS = SystemConfigurationsMetadata(
     training = SystemConfigurationMetadata(
         path = "configs/system/training/training.yaml"
     ),
+    validation = SystemConfigurationMetadata(
+        path = "configs/system/validation/validation.yaml"
+    ),
     evaluation = EvaluationMetadata(
         in_distribution = SystemConfigurationMetadata(
             path = "configs/system/evaluation/in_distribution.yaml"
@@ -57,7 +60,8 @@ TRAINING_METADATA = TrainingMetadata(
 LOGGING_METADATA = LoggingMetadata(
     verbose = 0,
     rolling_window_size = 100,
-    recording_frequency = TRAINING_METADATA.total_timesteps // 10,
+    num_checkpoints = 25,
+    num_videos = 10,
     logging_directories = LoggingDirectoriesMetadata(
         base = LOGGING_DIRECTORY,
         tensorboard = "training/metrics/tensorboard"

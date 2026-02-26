@@ -40,6 +40,7 @@ class SystemConfigurationsMetadata:
     A class for representing metadata about the system configurations of the experiment.
     """
     training: SystemConfigurationMetadata
+    validation: SystemConfigurationMetadata
     evaluation: EvaluationMetadata
 
 
@@ -117,7 +118,8 @@ class LoggingMetadata:
     logging_directories: LoggingDirectoriesMetadata
     verbose: int
     rolling_window_size: int
-    recording_frequency: int
+    num_checkpoints: int
+    num_videos: int
 
 
 def _make_yaml_safe(object: Any) -> Any:

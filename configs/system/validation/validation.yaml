@@ -1,0 +1,25 @@
+version: 1
+
+environment:
+  grid_dimensions:
+    width: 10
+    height: 10
+  obstacles_coordinates:
+    - [3, 3]
+    - [4, 4]
+    - [5, 5]
+    - [6, 6]
+  episode_time_limit: 10
+
+agent:
+  start_coordinates: [1, 1]
+  goal_coordinates: [8, 8]
+  velocity: 1
+  visibility_radius: 5
+  observation_stack_depth: 5
+
+seekers:
+  - start_coordinates: [1, 8]
+    velocity: 1
+  - start_coordinates: [8, 1]
+    velocity: 1
