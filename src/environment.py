@@ -144,7 +144,6 @@ class ReactiveAvoidanceEnv(MiniGridEnv):
         """
         # Initialize the grid
         self.grid = Grid(width, height)
-        self.grid.wall_rect(0, 0, width, height)
 
         # Place agent on the grid
         self.agent_pos = (self.config.agent.start_coordinates.x, self.config.agent.start_coordinates.y)
