@@ -42,6 +42,13 @@ class VideoCallback(BaseCallback):
         self.video_directory.mkdir(parents = True, exist_ok = True)
         self.next_recording_timestep = self.recording_frequency
 
+    def _on_step(self) -> bool:
+        """
+        Implements the _on_step method of the BaseCallback class.
+        
+        :return: Whether to continue training. Always returns True.
+        """
+        return True
 
     def _on_rollout_end(self) -> None:
         """
