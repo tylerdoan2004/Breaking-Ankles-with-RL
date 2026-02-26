@@ -9,6 +9,15 @@ from typing import Any, Optional
 
 
 @dataclass(frozen = True, kw_only = True, slots = True)
+class ModelMetadata:
+    """
+    A class for representing metadata about a model.
+    """
+    name: str
+    hyperparameters: dict[str, Any]
+
+
+@dataclass(frozen = True, kw_only = True, slots = True)
 class SystemConfigurationMetadata:
     """
     A class for representing metadata about a system configuration.
@@ -35,12 +44,12 @@ class SystemConfigurationsMetadata:
 
 
 @dataclass(frozen = True, kw_only = True, slots = True)
-class ModelMetadata:
+class TrainingMetadata:
     """
-    A class for representing metadata about a model.
+    A class for representing metadata about the training of the experiment.
     """
-    name: str
-    hyperparameters: dict[str, Any]
+    n_envs: int
+    total_timesteps: int
 
 
 @dataclass(frozen = True, kw_only = True, slots = True)
@@ -134,6 +143,7 @@ class ExperimentMetadata:
     seed: int
     model: ModelMetadata
     system_configurations: SystemConfigurationsMetadata
+    training: TrainingMetadata
     runtime: RuntimeMetadata
     logging: LoggingMetadata
 

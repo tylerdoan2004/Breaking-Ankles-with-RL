@@ -1,4 +1,12 @@
-from src.utils.logging.experiment_metadata import EvaluationMetadata, LoggingDirectoriesMetadata, LoggingMetadata, ModelMetadata, SystemConfigurationMetadata, SystemConfigurationsMetadata
+from src.utils.logging.experiment_metadata import (
+    EvaluationMetadata,
+    LoggingDirectoriesMetadata,
+    LoggingMetadata,
+    ModelMetadata,
+    SystemConfigurationMetadata,
+    SystemConfigurationsMetadata,
+    TrainingMetadata
+)
 
 
 LOGGING_DIRECTORY = "logs"
@@ -41,6 +49,10 @@ SYSTEM_CONFIGURATIONS = SystemConfigurationsMetadata(
             path = "configs/system/evaluation/out_of_distribution.yaml"
         )
     )
+)
+TRAINING_METADATA = TrainingMetadata(
+    n_envs = 8,
+    total_timesteps = 2_000_000
 )
 LOGGING_METADATA = LoggingMetadata(
     verbose = 0,
