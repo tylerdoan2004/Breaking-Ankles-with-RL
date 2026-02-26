@@ -185,7 +185,7 @@ class ReactiveAvoidanceEnv(MiniGridEnv):
         :param action: The action to take in the environment.
         :return: The new coordinates of the agent.
         """
-        movement_vector = self._action_map[int(action)]
+        movement_vector = self._action_map[action]
         for _ in range(self.config.agent.velocity):
             # Move the agent in the selected direction
             # NOTE: This movement allows the agent to 'slip' through diagonal obstacles
