@@ -115,8 +115,8 @@ class LoggingMetadata:
     A class for representing metadata about the logging environment of the experiment.
     """
     logging_directories: LoggingDirectoriesMetadata
-    verbose: Optional[int] = None
-    rolling_window_size: Optional[int] = None
+    verbose: int
+    rolling_window_size: int
 
 
 def _make_yaml_safe(object: Any) -> Any:
