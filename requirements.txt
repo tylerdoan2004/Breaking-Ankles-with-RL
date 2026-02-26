@@ -1,5 +1,5 @@
 # RL environment dependencies
-gymnasium
+gymnasium[other]
 minigrid
 numpy
 pyyaml
@@ -10,3 +10,4 @@ stable_baselines3
 
 # Visualization dependencies
 matplotlib
+tensorboard
