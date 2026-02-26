@@ -2,9 +2,8 @@
 This module contains helper functions for evaluation.
 """
 from pathlib import Path
-from stable_baselines3.common.env_util import make_vec_env
 from stable_baselines3.common.evaluation import evaluate_policy
-from stable_baselines3.common.vec_env import VecMonitor
+from stable_baselines3.common.vec_env import DummyVecEnv,VecMonitor
 from src.environment import make_env_from_yaml
 from src.utils.typing.agent import StableBaselines3Model
 
@@ -21,12 +20,8 @@ def evaluate_agent(*, model: StableBaselines3Model, yaml_file_path: str, environ
     :param metrics_directory: The directory used to store the evaluation metrics.
     :return: None.
     """
-    environment = make_vec_env(
-        lambda: make_env_from_yaml(yaml_file_path),
-        n_envs = 1,
-        seed = seed,
-        monitor_dir = None
-    )
+    environment = DummyVecEnv([lambda: make_env_from_yaml(yaml_file_path)])
+    environment.seed(seed)
     environment = VecMonitor(
         environment,
         filename = str(metrics_directory / "monitor.csv"),
