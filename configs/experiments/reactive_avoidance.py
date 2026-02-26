@@ -57,6 +57,7 @@ TRAINING_METADATA = TrainingMetadata(
 LOGGING_METADATA = LoggingMetadata(
     verbose = 0,
     rolling_window_size = 100,
+    recording_frequency = TRAINING_METADATA.total_timesteps // 10,
     logging_directories = LoggingDirectoriesMetadata(
         base = LOGGING_DIRECTORY,
         tensorboard = "training/metrics/tensorboard"

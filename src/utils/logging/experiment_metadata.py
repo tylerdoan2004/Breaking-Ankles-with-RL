@@ -117,6 +117,7 @@ class LoggingMetadata:
     logging_directories: LoggingDirectoriesMetadata
     verbose: int
     rolling_window_size: int
+    recording_frequency: int
 
 
 def _make_yaml_safe(object: Any) -> Any:
