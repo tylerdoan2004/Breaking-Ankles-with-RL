@@ -4,10 +4,12 @@ import shutil
 import sys
 import torch
 from pathlib import Path
-from typing import Any, Literal, Optional, Protocol, TypeVar
+from typing import cast, Optional
 from gymnasium import Env
 from gymnasium.wrappers import RecordVideo
 from src.utils.logging.experiment_metadata import ExperimentMetadata, HardwareMetadata, PackageMetadata, PythonMetadata, RuntimeMetadata, SoftwareMetadata
+from src.utils.typing.agent import ActType, Agent, ObsType
+from src.utils.typing.environment import VideoRecordableEnvironmentFactory
 
 
 def get_package_metadata(package_name: str) -> PackageMetadata:
@@ -98,44 +100,10 @@ def initialize_logging_directories(*, logging_directory: str, experiment_metadat
     return experiment_directory
 
 
-EnvTypeCovariant = TypeVar("EnvTypeCovariant", bound = Env, covariant = True)
-class VideoRecordableEnvironmentFactory(Protocol[EnvTypeCovariant]):
-    """
-    A protocol for creating video recordable environments.
-    """
-    def __call__(self, *args: Any, render_mode: Literal["rgb_array"], **kwargs: Any) -> EnvTypeCovariant:
-        """
-        Creates a video recordable environment.
-        
-        :param render_mode: The render mode to use for the environment.
-        :return: A video recordable environment.
-        """
-        ...
-
-
-ObsTypeContravariant = TypeVar("ObsTypeContravariant", contravariant = True)
-ActTypeCovariant = TypeVar("ActTypeCovariant", covariant = True)
-class Agent(Protocol[ObsTypeContravariant, ActTypeCovariant]):
-    """
-    A protocol for representing an agent.
-    """
-    def predict(self, observation: ObsTypeContravariant, *, deterministic: bool = True) -> ActTypeCovariant:
-        """
-        Predicts an action given an observation.
-        
-        :param observation: The observation used to predict the next action.
-        :param deterministic: Whether the agent predicts actions deterministically.
-        :return: The predicted action.
-        """
-        ...
-
-
-O = TypeVar("O")
-A = TypeVar("A")
 def record_video_single_episode(*,
                                 video_directory: str, video_name_prefix: str,
-                                environment_factory: VideoRecordableEnvironmentFactory[Env[O, A]],
-                                agent: Optional[Agent[O, A]] = None, deterministic: bool = True) -> None:
+                                environment_factory: VideoRecordableEnvironmentFactory[Env[ObsType, ActType]],
+                                agent: Optional[Agent[ObsType, ActType]] = None, deterministic: bool = True) -> None:
     """
     Records a video of a single episode of an agent performing actions in an environment.
     
@@ -146,18 +114,25 @@ def record_video_single_episode(*,
     :param deterministic: Whether the agent predicts actions deterministically.
     :return: None.
     """
-    environment = environment_factory(render_mode = "rgb_array")
+    environment: Env[ObsType, ActType] = environment_factory(render_mode = "rgb_array")
     environment = RecordVideo(
         env = environment,
         video_folder = video_directory,
         episode_trigger = lambda episode: episode == 0,
         name_prefix = video_name_prefix
     )
+    environment = cast(
+        Env[ObsType, ActType],
+        environment
+    )
 
     observation, _ = environment.reset()
     done = False
     while not done:
-        action = agent.predict(observation, deterministic = deterministic) if agent is not None else environment.action_space.sample()
+        if agent is None:
+            action = environment.action_space.sample()
+        else:
+            action = agent.predict(observation, deterministic = deterministic)
         observation, _, terminated, truncated, _ = environment.step(action)
         done = terminated or truncated
 
