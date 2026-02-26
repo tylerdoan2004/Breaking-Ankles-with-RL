@@ -78,7 +78,7 @@ class VideoCallback(BaseCallback):
 
 class RollingMetricsCallback(BaseCallback):
     """
-    A callback for computing and logging rolling metrics via the Stable Baselines3 logger.
+    A callback for computing and logging rolling metrics via the Stable Baselines 3 logger.
     """
     def __init__(self, *, rolling_window_size: int, outcomes: tuple[str, ...] = ("goal", "collision", "interception", "timeout"), verbose: int = 0) -> None:
         """
@@ -96,7 +96,7 @@ class RollingMetricsCallback(BaseCallback):
 
     def _on_step(self) -> bool:
         """
-        Computes and logs rolling metrics via the Stable Baselines3 logger.
+        Computes and logs rolling metrics via the Stable Baselines 3 logger.
         
         :return: Whether to continue training. Always returns True.
         """
