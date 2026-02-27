@@ -5,10 +5,11 @@ title: Home
 
 ## Breaking Ankles with RL
 
-A reinforcement learning project where an agent must navigate a 2D gridworld, avoid dynamic obstacles and seekers, and reach a goal under limited visibility. We use PPO to train the agent and evaluate its performance as the environment scales in difficulty.
+A reinforcement learning project where an agent must navigate a two-dimensional gridworld, avoid static obstacles and dynamic seekers, and reach a goal under limited visibility. We use Proximal Policy Optimization (PPO) to train the agent. We evaluate the agent's performance on several metrics as the environment scales in difficulty: the agent's success rate, the agent's collision rate, the seekers' interception rate, the agent's time-to-goal, and cumulative episode return.
 
-**Source code:** [GitHub Repository](https://github.com/tylerdoan2004/Breaking-Ankles-with-RL)
+![Project Image](images/Project%20Image.jpg)
 
+**Source Code:** [GitHub Repository](https://github.com/tylerdoan2004/Breaking-Ankles-with-RL)
 
 ---
 
@@ -22,7 +23,7 @@ We build our environment using [Gymnasium](https://gymnasium.farama.org/), a sta
 
 - [Gymnasium Documentation](https://gymnasium.farama.org/)
 - [MiniGrid Documentation](https://minigrid.farama.org/)
-- [Stable Baselines3](https://stable-baselines3.readthedocs.io/en/master/)
+- [Stable-Baselines3 Documentation](https://stable-baselines3.readthedocs.io/en/master/)
 
 ---
 
