@@ -1,9 +1,6 @@
----
-layout: default
-title:  Team
----
 
-# {{ page.title }}
+
+# Team Breaking Ankles
 
 
 ## Tyler Doan
