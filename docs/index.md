@@ -3,7 +3,7 @@ layout: default
 title: Home
 ---
 
-## Project Description
+## Project Outline
 
 A reinforcement learning project where an agent must navigate a two-dimensional gridworld, avoid static obstacles and dynamic seekers, and reach a goal under limited visibility. We use Proximal Policy Optimization (PPO) to train the agent. We evaluate the agent's performance on several metrics as the environment scales in difficulty: the agent's success rate, the agent's collision rate, the seekers' interception rate, the agent's time-to-goal, and cumulative episode return.
 
