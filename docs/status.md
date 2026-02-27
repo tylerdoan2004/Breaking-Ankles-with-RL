@@ -1,4 +1,4 @@
-# CompSci 175 Reinforcement Learning: Breaking Ankles with RL
+# Breaking Ankles with RL
 
 <iframe width="560" height="315" src="https://www.youtube.com/embed/GBCBPcb37m8?si=TS0idEZzSFmHQLQM" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>
 
@@ -7,7 +7,7 @@ Breaking Ankles with RL is a reinforcement-learning project studying reactive av
 
 The environment is implemented in Python using Gymnasium and built on MiniGrid as a simulation environment, operating in discrete time steps. The agent receives an observation of its position, the relative position of the goal, and the relative positions of nearby obstacles and seekers stacked over the last five frames to provide temporal context. The agents have 9 actions, to move to any one of the adjacent spaces or to not move at all, and using Proximal Policy Optimization through Stable Baselines 3 over many steps, we learn how to balance efficient goal direction movement and seeker and obstacle avoidance. This is all to simulate robotic exploration and autonomous navigation within dynamic environments.
 
-## Project Approach
+## Approach
 Our training-evaluation pipeline accepts as input four YAML files, each containing several environment hyperparameters that determine a particular environment configuration. In particular, these hyperparameters include the gridworld dimensions, the static obstacles' locations, the episode time limit, the agent's start and goal locations, the agent's velocity, the agent's visibility radius, the seekers' start locations, and the seekers' velocity. Given these four YAML files, our training-evaluation pipeline produces four environments: one corresponding to a training environment, one corresponding to a validation environment, and two corresponding to evaluation environments (one in-distribution environment and one out-of-distribution environment). 
 
 We implement each environment in Python using Gymnasium, a popular open-source library for implementing reinforcement learning environments. We use MiniGrid, an extension of the Gymnasium ecosystem with configurable grid environments, to assist in rendering our environments. Each environment operates in discrete time steps, and at each discrete time step, the agent receives an observation of the environment state and a scalar reward. At each time step, the environment state consists of the hyperparameters listed above, the agent's current position, and the seekers' current position. The agent's observation consists of a flattened one-dimensional vector of features, representing the agent's position.
@@ -90,7 +90,7 @@ The most significant challenge we anticipate is making sure the agent achieves r
 
 The other major challenge is keeping our training efficient. As we add complexity, our agents' observation and state space will be bloated with unnecessary information that slows training without meaningfully improving our policy. We want to make sure everything is purposeful and with reason, trimming anything that slows training without contributing to the behaviors we actually care about. Keeping training efficient while still providing the agent with everything it needs to make good decisions is a balance we will need to actively manage as the project develops.
 
-## AI Use
+## Resources Used
 We used AI tools to explore possible RL algorithms and to perform grammar checking on this proposal document. We also used AI when trying to get the environment to train.
 
 ## References

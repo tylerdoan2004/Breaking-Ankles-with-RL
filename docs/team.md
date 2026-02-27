@@ -1,7 +1,4 @@
-
-
 # Team Breaking Ankles
-
 
 ## Tyler Doan
 **UCI Net ID**: tylerqud
