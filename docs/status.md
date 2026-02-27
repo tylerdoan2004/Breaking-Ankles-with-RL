@@ -1,5 +1,7 @@
 # CompSci 175 Reinforcement Learning: Breaking Ankles with RL
 
+<iframe width="560" height="315" src="https://www.youtube.com/embed/GBCBPcb37m8?si=TS0idEZzSFmHQLQM" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>
+
 ## Project Summary
 Breaking Ankles with RL is a reinforcement-learning project studying reactive avoidance in a two-dimensional gridworld. In our problem setup, an agent with partial observability navigates from some starting location to some goal location while avoiding static obstacles and dynamic "seekers". Both the agent and the seekers traverse the gridworld at some constant velocity, and each seeker attempts to move in a manner that minimizes its Chebyshev distance to the agent. A single episode terminates when the agent reaches the objective, when a seeker intercepts the agent, when the agent collides with an obstacle or seeker, or when a time limit is reached. The training objective is to learn a policy that balances goal-oriented navigation with real-time evasive maneuvers. The overarching goal of our project is to develop a reinforcement learning framework that facilitates long-term autonomous navigation amidst short-term safety constraints. 
 
