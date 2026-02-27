@@ -71,6 +71,8 @@ All PPO hyperparameters are left at their Stable Baselines 3 defaults (source: S
 | Number of seekers | 1-2 | config/default.yaml |
 
 ## Evaluation
+<img src="images/RLgraph.png" width="500">
+
 After looking more into our project, we decided that our primary metrics will include success rate (percentage of episodes where the agent reaches the objective), capture rate (percentage of episodes where a seeker intercepts the agent), and time-to-goal (average time steps required for the agent to reach the objective).
 
 The reason for each of the metrics we've gathered is simple: for episode rewards, we want to monitor the amount of reward we give for each episode, seeing if the reward is consistent and not over or under-rewarding (PPO). Next, we have episode length. This is important to see how well our agent is at getting to a terminated state, whether it is running into the seeker or reaching the goal. The length here shows us that there are next to no scenarios that end up with an infinite loop where both the seeker and agent go back and forth. Next, we are able to use the goal reach rate and capture rate to see how well the agent actually performs as it learns a better policy.
