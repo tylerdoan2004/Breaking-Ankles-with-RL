@@ -9,21 +9,21 @@ title:  Team
 ## Tyler Doan
 **UCI Net ID**: tylerqud
 
-![Tyler](images/Tyler.jpeg)
+<img src="images/Tyler.jpeg" width="400">
 
 [LinkedIn](https://www.linkedin.com/in/tyler-quang-nhat-doan-7333a4316/)
 
 ## Zicong Yu
 **UCI Net ID**: zicongy1
 
-![Zicong](images/Zicong.jpeg)
+<img src="images/Zicong.jpeg" width="400">
 
 [LinkedIn](https://www.linkedin.com/in/zicong-yu-418650217/)
 
 ## Aston Chan
 **UCI Net ID**: kic2
 
-![Aston](images/Aston.jpeg)
+<img src="images/Aston.jpeg" width="400">
 
 [LinkedIn](https://www.linkedin.com/in/aston-chan/)
 
