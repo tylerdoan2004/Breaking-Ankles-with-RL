@@ -1,20 +1,23 @@
----
-layout: default
-title:  Team
----
-
-# {{ page.title }}
-
+# Team Breaking Ankles
 
 ## Tyler Doan
-***UCI Net ID***: tylerqud
-[LinkedIn](https://www.linkedin.com/in/tyler-quang-nhat-doan-7333a4316/)
+**UCI Net ID**: tylerqud
+
+<img src="images/Tyler.jpeg" width="400">
+
+**[LinkedIn](https://www.linkedin.com/in/tyler-quang-nhat-doan-7333a4316/)**
 
 ## Zicong Yu
-***UCI Net ID***: zicongy1
-[LinkedIn](https://www.linkedin.com/in/zicong-yu-418650217/)
+**UCI Net ID**: zicongy1
+
+<img src="images/Zicong.jpeg" width="400">
+
+**[LinkedIn](https://www.linkedin.com/in/zicong-yu-418650217/)**
 
 ## Aston Chan
-***UCI Net ID***: kic2
-[LinkedIn](https://www.linkedin.com/in/aston-chan/)
+**UCI Net ID**: kic2
+
+<img src="images/Aston.jpeg" width="400">
+
+**[LinkedIn](https://www.linkedin.com/in/aston-chan/)**
 
