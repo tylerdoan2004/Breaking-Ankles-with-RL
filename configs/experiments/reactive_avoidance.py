@@ -1,5 +1,3 @@
-from numpy import roll
-
 from src.utils.logging.experiment_metadata import (
     EvaluationMetadata,
     LoggingDirectoriesMetadata,
