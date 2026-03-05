@@ -1,6 +1,7 @@
 """
 This module provides the ReactiveAvoidanceEnvironment class for representing a two-dimensional gridworld environment where an agent traverses from some start coordinates to some goal coordinates while avoiding static obstacles and one or more seekers.
 """
+import heapq
 import numpy as np
 from collections import deque
 from pathlib import Path
@@ -200,22 +201,125 @@ class ReactiveAvoidanceEnv(MiniGridEnv):
         # Return the final coordinates
         return self._current_agent_coordinates
 
-    def _seeker_policy(self, current_coordinates: Coordinates, current_agent_coordinates: Coordinates) -> Vector:
+    def _astar(self, start: Coordinates, goal: Coordinates) -> Vector:
         """
-        Returns the movement vector that minimizes the Chebyshev distance between the seeker and the agent.
+        Uses A* pathfinding to find the next move from start toward goal, navigating around obstacles.
+        Returns the movement vector for the first step, or Vector(0,0) if no path exists.
         
-        :param current_coordinates: The current coordinates of the seeker.
-        :param current_agent_coordinates: The current coordinates of the agent.
-        :return: The movement vector that minimizes the Chebyshev distance between the seeker and the agent.
+        :param start: The starting coordinates.
+        :param goal: The goal coordinates.
+        :return: The movement vector for the first step along the shortest path.
         """
-        return Vector(
-            np.sign(current_agent_coordinates.x - current_coordinates.x).astype(int),
-            np.sign(current_agent_coordinates.y - current_coordinates.y).astype(int)
-        )
+        if start == goal:
+            return Vector(0, 0)
+
+        # Heuristic: Chebyshev distance (since we allow 8-directional movement)
+        def heuristic(a: Coordinates, b: Coordinates) -> int:
+            return max(abs(a.x - b.x), abs(a.y - b.y))
+
+        # Obstacles that block seeker movement
+        obstacles = set(self.config.environment.obstacles_coordinates)
+
+        # Priority queue: (f_score, tie_breaker, coordinates, first_move_vector)
+        open_set: list[tuple[int, int, Coordinates, Vector]] = []
+        tie_breaker = 0
+        heapq.heappush(open_set, (heuristic(start, goal), tie_breaker, start, Vector(0, 0)))
+        visited: set[Coordinates] = set()
+
+        # 8-directional movements
+        directions = [
+            Vector(0, 0), Vector(0, 1), Vector(1, 0), Vector(0, -1), Vector(-1, 0),
+            Vector(1, 1), Vector(1, -1), Vector(-1, 1), Vector(-1, -1)
+        ]
+
+        while open_set:
+            f, _, current, first_move = heapq.heappop(open_set)
+            if current in visited:
+                continue
+            visited.add(current)
+
+            if current == goal:
+                return first_move
+
+            g = f - heuristic(current, goal)
+
+            for direction in directions:
+                if direction.x == 0 and direction.y == 0:
+                    continue
+                neighbor = current + direction
+                if neighbor in visited:
+                    continue
+                if not self.config.environment.grid_dimensions.contains_coordinates(neighbor):
+                    continue
+                if neighbor in obstacles:
+                    continue
+                # The first move to record is the direction from start
+                next_first_move = first_move if first_move != Vector(0, 0) else direction
+                new_g = g + 1
+                new_f = new_g + heuristic(neighbor, goal)
+                tie_breaker += 1
+                heapq.heappush(open_set, (new_f, tie_breaker, neighbor, next_first_move))
+
+        # No path found — stay still
+        return Vector(0, 0)
+
+    def _astar_distance(self, start: Coordinates, goal: Coordinates) -> int:
+        """
+        Computes the A* shortest path distance from start to goal, navigating around obstacles.
+        Returns a large value if no path exists.
+        
+        :param start: The starting coordinates.
+        :param goal: The goal coordinates.
+        :return: The shortest path distance.
+        """
+        if start == goal:
+            return 0
+
+        # Heuristic: Chebyshev distance
+        def heuristic(a: Coordinates, b: Coordinates) -> int:
+            return max(abs(a.x - b.x), abs(a.y - b.y))
+
+        obstacles = set(self.config.environment.obstacles_coordinates)
+
+        # Priority queue: (f_score, tie_breaker, g_score, coordinates)
+        open_set: list[tuple[int, int, int, Coordinates]] = []
+        tie_breaker = 0
+        heapq.heappush(open_set, (heuristic(start, goal), tie_breaker, 0, start))
+        visited: set[Coordinates] = set()
+
+        directions = [
+            Vector(0, 1), Vector(1, 0), Vector(0, -1), Vector(-1, 0),
+            Vector(1, 1), Vector(1, -1), Vector(-1, 1), Vector(-1, -1)
+        ]
+
+        while open_set:
+            f, _, g, current = heapq.heappop(open_set)
+            if current in visited:
+                continue
+            visited.add(current)
+
+            if current == goal:
+                return g
+
+            for direction in directions:
+                neighbor = current + direction
+                if neighbor in visited:
+                    continue
+                if not self.config.environment.grid_dimensions.contains_coordinates(neighbor):
+                    continue
+                if neighbor in obstacles:
+                    continue
+                new_g = g + 1
+                new_f = new_g + heuristic(neighbor, goal)
+                tie_breaker += 1
+                heapq.heappush(open_set, (new_f, tie_breaker, new_g, neighbor))
+
+        # No path found — return large distance
+        return self.config.environment.grid_dimensions.width + self.config.environment.grid_dimensions.height
 
     def _move_seeker(self, current_coordinates: Coordinates, velocity: int) -> Coordinates:
         """
-        Moves the seeker in the environment based on its current coordinates and velocity.  The seeker picks the action that minimizes Chebyshev distance to the agent.
+        Moves the seeker using A* pathfinding to navigate toward the agent around obstacles.
         
         :param current_coordinates: The current coordinates of the seeker.
         :param velocity: The velocity of the seeker.
@@ -224,15 +328,15 @@ class ReactiveAvoidanceEnv(MiniGridEnv):
         # Remove the old seeker from the grid
         self.grid.set(current_coordinates.x, current_coordinates.y, None)
         for _ in range(velocity):
-            movement_vector = self._seeker_policy(current_coordinates, self._current_agent_coordinates)
+            movement_vector = self._astar(current_coordinates, self._current_agent_coordinates)
+            if movement_vector == Vector(0, 0):
+                break
             new_coordinates = current_coordinates + movement_vector
-            # If the seeker cannot be in the new coordinates or if the new coordinates are the goal coordinates, return the old coordinates
-            if not self._can_agent_be_in(new_coordinates) or new_coordinates == self.config.agent.goal_coordinates:
-                # Update the seeker's coordinates in the grid
-                self.grid.set(current_coordinates.x, current_coordinates.y, Seeker())
-                return current_coordinates
+            # If the new coordinates are blocked by another seeker, stop
+            if new_coordinates in self._current_seeker_coordinates:
+                break
             # Otherwise, move the seeker in the selected direction
-            current_coordinates += movement_vector
+            current_coordinates = new_coordinates
         # Update the seeker's coordinates in the grid
         self.grid.set(current_coordinates.x, current_coordinates.y, Seeker())
         return current_coordinates
@@ -257,9 +361,12 @@ class ReactiveAvoidanceEnv(MiniGridEnv):
         :param action: The action to take in the environment.
         :return: A tuple containing the observation, reward, termination flag, truncation flag, and auxiliary info dictionary.
         """
-        # TODO: Reward shaping
         action = cast(int, action)
         self._current_step += 1
+
+        # Save previous A* distance to goal for reward shaping
+        goal = self.config.agent.goal_coordinates
+        prev_distance = self._astar_distance(self._current_agent_coordinates, goal)
 
         # Move the agent
         self._current_agent_coordinates = self._move_agent(action)
@@ -282,8 +389,15 @@ class ReactiveAvoidanceEnv(MiniGridEnv):
         if self._current_agent_coordinates in self._current_seeker_coordinates:
             return self._finalize_step(reward = -1.0, terminated = True, truncated = truncated, outcome = "interception")
 
+        # Reward shaping: use A* path distance to incentivize following the shortest path to goal
+        curr_distance = self._astar_distance(self._current_agent_coordinates, goal)
+        step_penalty = -1 / self.config.environment.episode_time_limit
+        # Reward for getting closer along the actual shortest path (accounts for obstacles)
+        # prev_distance - curr_distance is +1 if agent moved one step closer, -1 if farther, 0 if same
+        goal_shaping = 0.5 * (prev_distance - curr_distance)
+
         # Otherwise, continue the episode
-        return self._finalize_step(reward = -1 / self.config.environment.episode_time_limit, terminated = False, truncated = truncated, outcome = "timeout" if truncated else None)
+        return self._finalize_step(reward = step_penalty + goal_shaping, terminated = False, truncated = truncated, outcome = "timeout" if truncated else None)
 
     # def step(self, action):
 

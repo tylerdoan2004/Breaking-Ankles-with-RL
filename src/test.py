@@ -8,9 +8,9 @@ from src.utils.yaml_parser.configuration import SystemConfiguration
 # Loads in the trained model and creates a test environment
 print("Loading trained model...")
 
-test_yaml_file = Path("config/default.yaml")
+test_yaml_file = Path("configs/system/evaluation/in_distribution.yaml")
 test_env = ReactiveAvoidanceEnv(config = SystemConfiguration.parse_config_file(test_yaml_file) ,render_mode="human")
-model = PPO.load("ppo_reactive_avoidance", env=test_env)
+model = PPO.load("logs/reactive_avoidance/ppo/2026-03-04-23-25-47-306055/models/best_model", env=test_env)
 
 # Defining the number of times to test in this environment
 print("Starting testing with visualization...")
@@ -24,10 +24,11 @@ for episode in range(num_episodes):
     obs, info = test_env.reset()
     
     # The maximum number of steps per episode, can change based on grid size
-    for step in range(100):
+    for step in range(120):
 
         # Get action from trained model
         action, _ = model.predict(obs, deterministic=True)
+        action = int(action)
         
         # Take step and get environment states
         obs, reward, terminated, truncated, info = test_env.step(action)

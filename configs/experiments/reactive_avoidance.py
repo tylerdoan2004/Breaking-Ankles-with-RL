@@ -54,10 +54,8 @@ SYSTEM_CONFIGURATIONS = SystemConfigurationsMetadata(
     )
 )
 TRAINING_METADATA = TrainingMetadata(
-    # n_envs = 8,
-    # total_timesteps = 2_000_000
-    n_envs = 2,
-    total_timesteps = 1_000
+    n_envs = 8,
+    total_timesteps = 2_000_000
 )
 LOGGING_METADATA = LoggingMetadata(
     logging_directories = LoggingDirectoriesMetadata(
@@ -65,16 +63,12 @@ LOGGING_METADATA = LoggingMetadata(
         tensorboard = "training/metrics/tensorboard"
     ),
     verbose = 0,
-    # rolling_window_size = 200,
-    # num_checkpoints = 25,
-    # num_validation_evaluations = 25,
-    # episodes_per_validation_evaluation = 25,
-    # episodes_per_evaluation = 200,
-    # num_videos = 10
-    rolling_window_size = 10,
-    num_checkpoints = 2,
-    num_validation_evaluations = 2,
-    episodes_per_validation_evaluation = 2,
-    episodes_per_evaluation = 5,
-    num_videos = 2,
+    rolling_window_size = 200,
+    num_checkpoints = 25,
+    num_validation_evaluations = 25,
+    episodes_per_validation_evaluation = 25,
+    episodes_per_evaluation = 200,
+    num_videos = 10,
+
 )
+
