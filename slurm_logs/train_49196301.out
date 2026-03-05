@@ -1,0 +1,16 @@
+Job started at: Wed Mar  4 06:22:37 PM PST 2026
+Running on node: hpc3-14-02
+Job ID: 49196301
+Python: /data/class/cs175/zicongy1/.conda/envs/reactive_avoidance/bin/python
+Python version: Python 3.11.14
+Starting training...
+ 100% ━━━━━━━━━━━━━━━━━━━━ 2,015,232/2,000,000  [ 2:46:02 < 0:00:00 , 157 it/s ]
+[Evaluation] In Distribution
+Number of episodes: 200
+Mean reward: 15.225
+Standard deviation: 0.000
+[Evaluation] Out of Distribution
+Number of episodes: 200
+Mean reward: -1.020
+Standard deviation: 0.000
+Training completed at: Wed Mar  4 09:10:41 PM PST 2026
