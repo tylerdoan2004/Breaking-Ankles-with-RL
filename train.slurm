@@ -22,7 +22,7 @@
 # --- Configuration ---
 # Adjust these to match your cluster setup
 PROJECT_DIR="$HOME/ReactiveAvoidanceRL"
-VENV_DIR="$PROJECT_DIR/.venv"
+CONDA_ENV="reactive_avoidance"
 
 # --- Setup ---
 echo "Job started at: $(date)"
@@ -39,12 +39,13 @@ cd "$PROJECT_DIR" || exit 1
 # module load python/3.11
 # module load cuda/12.0
 
-# Activate virtual environment
-# If this is the first run, create the venv first:
-#   python3 -m venv .venv
-#   source .venv/bin/activate
+# Activate conda environment
+# If this is the first run, create the env first:
+#   conda create -n reactive_avoidance python=3.11 -y
+#   conda activate reactive_avoidance
 #   pip install -r requirements.txt
-source "$VENV_DIR/bin/activate"
+source "$(conda info --base)/etc/profile.d/conda.sh"
+conda activate "$CONDA_ENV"
 
 echo "Python: $(which python)"
 echo "Python version: $(python --version)"
