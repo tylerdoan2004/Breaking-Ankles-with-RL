@@ -21,7 +21,7 @@
 
 # --- Configuration ---
 # Adjust these to match your cluster setup
-PROJECT_DIR="$HOME/ReactiveAvoidanceRL"
+PROJECT_DIR="$HOME/Breaking-Ankles-with-RL"
 CONDA_ENV="reactive_avoidance"
 
 # --- Setup ---
