@@ -1,5 +1,5 @@
 """
-A module for typing environments.
+A module for statically type-checking environments.
 """
 from typing import Any, Literal, Protocol, TypeVar
 from gymnasium import Env

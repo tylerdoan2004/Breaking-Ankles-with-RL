@@ -259,17 +259,7 @@ def is_environment_config_shallowly_valid(data: Any) -> bool:
     return True
 
 
-def are_obstacles_unique(obstacles_cordinates: list[Coordinates]) -> bool:
-    """
-    Checks if the obstacles' coordinates are unique.
-    
-    :param obstacles_cordinates: The obstacles' coordinates to check.
-    :return: True if the obstacles' coordinates are unique, False otherwise.
-    """
-    return len(set(obstacles_cordinates)) == len(obstacles_cordinates)
-
-
-def are_obstacles_in_grid(obstacles_coordinates: list[Coordinates], grid_dimensions: GridDimensions) -> bool:
+def are_obstacles_in_grid(obstacles_coordinates: set[Coordinates], grid_dimensions: GridDimensions) -> bool:
     """
     Checks if the obstacles' coordinates are in the grid dimensions.
     
@@ -438,8 +428,6 @@ def validate_system_configuration(system_configuration: SystemConfiguration) -> 
     """
     grid_dimensions = system_configuration.environment.grid_dimensions
 
-    if not are_obstacles_unique(system_configuration.environment.obstacles_coordinates):
-        raise ValueError(f"The obstacles' coordinates are not unique: {system_configuration.environment.obstacles_coordinates}")
     if not are_obstacles_in_grid(system_configuration.environment.obstacles_coordinates, grid_dimensions):
         raise ValueError(f"The obstacles' coordinates are not in the grid dimensions: {system_configuration.environment.obstacles_coordinates}")
 
@@ -454,17 +442,17 @@ def validate_system_configuration(system_configuration: SystemConfiguration) -> 
     if not do_seekers_start_in_grid(seekers_start_coordinates, grid_dimensions):
         raise ValueError(f"The seekers' start coordinates are not in the grid dimensions: {seekers_start_coordinates}")
 
-    if intersects([system_configuration.agent.start_coordinates], system_configuration.environment.obstacles_coordinates):
+    if intersects([system_configuration.agent.start_coordinates], list(system_configuration.environment.obstacles_coordinates)):
         raise ValueError(f"The agent's start coordinates intersect with an obstacle: {system_configuration.agent.start_coordinates}")
     if intersects([system_configuration.agent.start_coordinates], [system_configuration.agent.goal_coordinates]):
         raise ValueError(f"The agent's start coordinates intersect with the agent's goal coordinates: {system_configuration.agent.start_coordinates}")
     if intersects([system_configuration.agent.start_coordinates], seekers_start_coordinates):
         raise ValueError(f"The agent's start coordinates intersect with a seeker's start coordinates: {system_configuration.agent.start_coordinates}")
-    if intersects([system_configuration.agent.goal_coordinates], system_configuration.environment.obstacles_coordinates):
+    if intersects([system_configuration.agent.goal_coordinates], list(system_configuration.environment.obstacles_coordinates)):
         raise ValueError(f"The agent's goal coordinates intersect with an obstacle: {system_configuration.agent.goal_coordinates}")
     if intersects([system_configuration.agent.goal_coordinates], seekers_start_coordinates):
         raise ValueError(f"The agent's goal coordinates intersect with a seeker's start coordinates: {system_configuration.agent.goal_coordinates}")
-    if intersects(seekers_start_coordinates, system_configuration.environment.obstacles_coordinates):
+    if intersects(seekers_start_coordinates, list(system_configuration.environment.obstacles_coordinates)):
         raise ValueError(f"The seekers' start coordinates intersect with an obstacle: {seekers_start_coordinates}")
 
     if does_agent_velocity_exceed_grid_dimensions(system_configuration.agent.velocity, grid_dimensions):
@@ -473,8 +461,8 @@ def validate_system_configuration(system_configuration: SystemConfiguration) -> 
         warn(f"The agent's velocity exceeds the agent's visibility radius: {system_configuration.agent.velocity}", RuntimeWarning)
 
     minimum_moves = minimum_unit_moves_to_reach_goal(grid_dimensions,
-                                                system_configuration.agent.start_coordinates, system_configuration.agent.goal_coordinates,
-                                                system_configuration.environment.obstacles_coordinates)
+                                                     system_configuration.agent.start_coordinates, system_configuration.agent.goal_coordinates,
+                                                     list(system_configuration.environment.obstacles_coordinates))
     if minimum_moves is None:
         raise ValueError(f"The agent cannot reach the goal coordinates from the start coordinates given the obstacles: {system_configuration.environment.obstacles_coordinates}")
 

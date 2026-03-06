@@ -5,9 +5,12 @@ import sys
 import numpy as np
 import torch
 from pathlib import Path
-from typing import cast, Optional
+from typing import cast, Iterable, Literal, Optional, Union
 from gymnasium import Env
 from gymnasium.wrappers import RecordVideo
+from src.utils.environment.coordinates import Coordinates
+from src.utils.environment.grid_dimensions import GridDimensions
+from src.utils.environment.helpers import chebyshev_distance
 from src.utils.logging.experiment_metadata import ExperimentMetadata, HardwareMetadata, PackageMetadata, PythonMetadata, RuntimeMetadata, SoftwareMetadata
 from src.utils.typing.agent import ActType, Agent, ObsType
 from src.utils.typing.environment import VideoRecordableEnvironmentFactory
@@ -136,3 +139,82 @@ def record_video_single_episode(*,
             done = terminated or truncated
     finally:
         environment.close()
+
+
+def compute_distance_to_hazards(*,
+                                current_agent_coordinates: Coordinates,
+                                obstacles_coordinates: Iterable[Coordinates],
+                                grid_dimensions: GridDimensions,
+                                seekers_coordinates: Iterable[Coordinates]) -> dict[Literal["obstacle", "boundary", "seeker"], int]:
+    """
+    Computes the agent's distance to each type of hazard.
+    
+    :param current_agent_coordinates: The current coordinates of the agent.
+    :param obstacles_coordinates: The coordinates of the obstacles.
+    :param grid_dimensions: The grid dimensions.
+    :param seekers_coordinates: The coordinates of the seekers.
+    :return: A dictionary containing the agent's distance to each type of hazard.
+    """
+    return {
+        "obstacle": min(chebyshev_distance(current_agent_coordinates, obstacle_coordinates) for obstacle_coordinates in obstacles_coordinates),
+        "boundary": min(current_agent_coordinates.x + 1, grid_dimensions.width - current_agent_coordinates.x, current_agent_coordinates.y + 1, grid_dimensions.height - current_agent_coordinates.y),
+        "seeker": min(chebyshev_distance(current_agent_coordinates, seeker_coordinates) for seeker_coordinates in seekers_coordinates),
+    }
+
+
+
+def compute_net_progress(starting_time_steps_to_goal: Optional[int], ending_time_steps_to_goal: Optional[int]) -> Optional[int]:
+    """
+    Computes the net progress of the agent over an episode.
+    
+    :param starting_time_steps_to_goal: The minimum number of time steps to the goal at the start of the episode.
+    :param ending_time_steps_to_goal: The minimum number of time steps to the goal at the end of the episode.
+    :return: The net progress of the agent over the episode.
+    """
+    if starting_time_steps_to_goal is None or ending_time_steps_to_goal is None:
+        return None
+    return starting_time_steps_to_goal - ending_time_steps_to_goal
+
+
+def compute_path_efficiency(outcome: Optional[str], starting_time_steps_to_goal: Optional[int], episode_length: int) -> Optional[float]:
+    """
+    Computes the path efficiency of the agent over an episode. The path efficiency is the ratio of the minimum number of time steps to the goal 
+    at the start of the episode to the time step at which the episode ended. The path efficiency is only valid if the agent reached the goal.
+    
+    :param outcome: The outcome of the episode.
+    :param starting_time_steps_to_goal: The minimum number of time steps to the goal at the start of the episode.
+    :param episode_length: The length of the episode.
+    :return: The path efficiency of the agent over the episode.
+    """
+    if outcome != "goal" or starting_time_steps_to_goal is None:
+        return None
+    return starting_time_steps_to_goal / episode_length
+
+
+def compute_episode_metrics(*,
+                            outcome: Optional[str],
+                            starting_time_steps_to_goal: Optional[int],
+                            ending_time_steps_to_goal: Optional[int],
+                            episode_length: int,
+                            minimum_distance_to_hazards: dict[Literal["obstacle", "boundary", "seeker"], int],
+                            collision_type: Optional[str]) -> dict[str, Optional[Union[int, float, str]]]:
+    """
+    Computes the metrics for an episode.
+    
+    :param outcome: The outcome of the episode.
+    :param starting_time_steps_to_goal: The minimum number of time steps to the goal at the start of the episode.
+    :param ending_time_steps_to_goal: The minimum number of time steps to the goal at the end of the episode.
+    :param episode_length: The length of the episode.
+    :param minimum_distance_to_hazards: A dictionary mapping the type of hazard to the agent's minimum Chebyshev distance to the hazard.
+    :param collision_type: The type of collision that occurred during the episode.
+    :return: A dictionary of episode metrics.
+    """
+    episode_metrics: dict[str, Optional[Union[int, float, str]]] = {}
+    episode_metrics["outcome"] = outcome
+    episode_metrics["net_progress"] = compute_net_progress(starting_time_steps_to_goal, ending_time_steps_to_goal)
+    episode_metrics["path_efficiency"] = compute_path_efficiency(outcome, starting_time_steps_to_goal, episode_length)
+    episode_metrics["minimum_distance_to_obstacle"] = minimum_distance_to_hazards.get("obstacle")
+    episode_metrics["minimum_distance_to_boundary"] = minimum_distance_to_hazards.get("boundary")
+    episode_metrics["minimum_distance_to_seeker"] = minimum_distance_to_hazards.get("seeker")
+    episode_metrics["collision_type"] = collision_type
+    return episode_metrics

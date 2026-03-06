@@ -14,7 +14,10 @@ class VideoCallback(BaseCallback):
     """
     A callback for recording a video of a single episode of an agent performing actions in an environment.
     """
-    def __init__(self, *, video_directory: str, video_name_prefix: str, environment_factory: VideoRecordableEnvironmentFactory, seed: int, recording_frequency: int, verbose: int = 0) -> None:
+    def __init__(self, *, video_directory: str, video_name_prefix: str,
+                 environment_factory: VideoRecordableEnvironmentFactory, seed: int,
+                 recording_frequency: int,
+                 verbose: int = 0) -> None:
         """
         Initializes the VideoCallback object.
         
@@ -78,7 +81,7 @@ class VideoCallback(BaseCallback):
 
 class RollingMetricsCallback(BaseCallback):
     """
-    A callback for computing and logging rolling metrics via the Stable Baselines 3 logger.
+    A callback for computing and logging rolling metrics via the Stable Baselines3 logger.
     """
     def __init__(self, *, rolling_window_size: int, outcomes: tuple[str, ...] = ("goal", "collision", "interception", "timeout"), verbose: int = 0) -> None:
         """
