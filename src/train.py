@@ -56,7 +56,10 @@ def main():
     environment = VecMonitor(
         environment,
         filename = str(experiment_directory / "training/metrics/monitor.csv"),
-        info_keywords = ("outcome",)
+        info_keywords = ("outcome",
+                         "net_progress",
+                         "path_efficiency",
+                         "minimum_distance_to_obstacle", "minimum_distance_to_boundary", "minimum_distance_to_seeker", "collision_type")
     )
     print("Vectorized training environment created.")
     
@@ -101,7 +104,10 @@ def main():
     validation_environment = VecMonitor(
         validation_environment,
         filename = None,
-        info_keywords = ("outcome",)
+        info_keywords = ("outcome",
+                         "net_progress",
+                         "path_efficiency",
+                         "minimum_distance_to_obstacle", "minimum_distance_to_boundary", "minimum_distance_to_seeker", "collision_type")
     )
     eval_callback = EvalCallback(
         eval_env = validation_environment,
