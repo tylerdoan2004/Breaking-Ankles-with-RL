@@ -10,7 +10,16 @@ from minigrid.core.mission import MissionSpace
 from minigrid.core.world_object import Goal, Wall
 from minigrid.minigrid_env import MiniGridEnv
 from src.utils.environment.coordinates import Coordinates
-from src.utils.environment.helpers import calculate_observation_space, can_see, compute_offset_to_line_mapping, scale_absolute_coordinates, scale_relative_vector, move_agent, move_seeker
+from src.utils.environment.helpers import (
+    calculate_observation_space,
+    can_see,
+    compute_offset_to_line_mapping,
+    compute_time_steps_to_goal_mapping,
+    scale_absolute_coordinates,
+    scale_relative_vector,
+    move_agent,
+    move_seeker
+)
 from src.utils.environment.seeker import Seeker
 from src.utils.environment.vector import Vector
 from src.utils.yaml_parser.configuration import SystemConfiguration
@@ -39,8 +48,13 @@ class ReactiveAvoidanceEnv(MiniGridEnv):
         self.config = config
         # Compute caches
         self._visibility_rays = compute_offset_to_line_mapping(config.agent.visibility_radius)
-        # self._time_steps_to_goal_mapping = compute_time_steps_to_goal_mapping()
-        
+        self._time_steps_to_goal_mapping = compute_time_steps_to_goal_mapping(
+            goal_coordinates = config.agent.goal_coordinates,
+            grid_dimensions = config.environment.grid_dimensions,
+            obstacles_coordinates = config.environment.obstacles_coordinates,
+            agent_velocity = config.agent.velocity
+        )
+
         # Initialize the internal dynamic components of the environment state
         self._current_step = 0
         self._current_agent_coordinates = config.agent.start_coordinates

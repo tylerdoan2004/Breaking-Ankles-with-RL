@@ -2,6 +2,7 @@
 This module provides helper functions for the reactive avoidance environment.
 """
 import numpy as np
+from collections import deque
 from random import choice
 from typing import Iterable, Literal
 from gymnasium.spaces import Box
@@ -272,3 +273,46 @@ def move_seeker(*,
                                         grid_dimensions = grid_dimensions, obstacles_coordinates = obstacles_coordinates, seekers_coordinates = seekers_coordinates, goal_coordinates = goal_coordinates)
         intermediate_coordinates += movement_vector
     return intermediate_coordinates
+
+
+def compute_time_steps_to_goal_mapping(*, goal_coordinates: Coordinates, grid_dimensions: GridDimensions, obstacles_coordinates: Iterable[Coordinates], agent_velocity: int) -> dict[Coordinates, int]:
+    """
+    Computes the minimum number of time steps to reach the goal coordinates for each valid pair of coordinates in the grid.
+    
+    :return: A dictionary mapping each valid pair of coordinates in the grid to the minimum number of time steps to reach the goal coordinates from that pair of coordinates.
+    """
+    obstacles_coordinates = frozenset(obstacles_coordinates)
+    # Determine all valid coordinates in the grid
+    valid_coordinates: list[Coordinates] = []
+    for x in range(grid_dimensions.width):
+        for y in range(grid_dimensions.height):
+            coordinates = Coordinates(x, y)
+            if not can_entity_be_in(coordinates, grid_dimensions = grid_dimensions, obstacles_coordinates = obstacles_coordinates, seekers_coordinates = ()):
+                continue
+            valid_coordinates.append(coordinates)
+
+    # Build predecessor lists
+    predecessors: dict[Coordinates, list[Coordinates]] = {coordinates: [] for coordinates in valid_coordinates}
+    if goal_coordinates not in predecessors:
+        return {}
+    for current_coordinates in valid_coordinates:
+        for movement_vector in (Vector(0, 1), Vector(1, 0), Vector(0, -1), Vector(-1, 0), Vector(1, 1), Vector(1, -1), Vector(-1, 1), Vector(-1, -1)):
+            next_coordinates, collided, _ = move_agent(current_coordinates = current_coordinates, velocity = agent_velocity, movement_vector = movement_vector,
+                                                       grid_dimensions = grid_dimensions, obstacles_coordinates = obstacles_coordinates, seekers_coordinates = (), goal_coordinates = goal_coordinates)
+            if collided:
+                continue
+            if next_coordinates in predecessors:
+                predecessors[next_coordinates].append(current_coordinates)
+
+    # Reverse BFS from the goal coordinates
+    time_steps_to_goal = {goal_coordinates: 0}
+    queue = deque([goal_coordinates])
+    while queue:
+        current_coordinates = queue.popleft()
+        current_time_steps_to_goal = time_steps_to_goal[current_coordinates]
+        for predecessor_coordinates in predecessors[current_coordinates]:
+            if predecessor_coordinates in time_steps_to_goal:
+                continue
+            time_steps_to_goal[predecessor_coordinates] = current_time_steps_to_goal + 1
+            queue.append(predecessor_coordinates)
+    return time_steps_to_goal
