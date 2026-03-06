@@ -19,8 +19,8 @@ def calculate_observation_space(visibility_radius: int, observation_stack_depth:
     current_observation_dimensions = 4
     # Calculate the size of the area visible to the agent
     visible_area_size = (2 * visibility_radius + 1) ** 2
-    # At some time step, the agent observes three channels of information: whether the agent observes an obstacle, whether the agent observes a seeker, and whether the agent observes the goal
-    observation_channels = 3
+    # At some time step, the agent observes four channels of information: whether the agent cannot observe a cell, whether the agent observes an out-of-bounds cell, whether the agent observes an obstacle, and whether the agent observes a seeker
+    observation_channels = 4
     # Given the environment state at some time step, we encode the agent's three channels of information for each cell in the visible area (referred to as the agent's local observation of the environment state)
     dimensions_per_local_observation = observation_channels * visible_area_size
     # Given the environment state at some time step, we additionally encode the agent's previous observations of the environment state (excluding the agent's previous positions and the previous relative positions of the goal); that is, we additionally encode the agent's previous local observations of the environment state
@@ -58,17 +58,25 @@ def scale_relative_vector(vector: Vector, grid_width: int, grid_height: int) -> 
     return np.array([scaled_x_component, scaled_y_component], dtype = np.float32)
 
 
-def can_see(start: Coordinates, end: Coordinates, obstacles: set[Coordinates]) -> bool:
+def compute_offset_to_line_mapping(radius: int) -> dict[Vector, list[Coordinates]]:
     """
-    Checks if the end coordinates can be seen from the start coordinates given the obstacles' coordinates.
+    Computes a mapping from each offset vector within a Chebyshev ball of the given radius to the discrete line segment from the origin to that offset.
     
-    :param start: The starting coordinates.
-    :param end: The ending coordinates.
-    :param obstacles: The obstacles' coordinates.
-    :return: True if the end coordinates can be seen from the start coordinates given the obstacles' coordinates, False otherwise.
+    :param radius: The radius of the Chebyshev ball.
+    :return: A mapping from each offset vector within a Chebyshev ball of the given radius to the discrete line segment from the origin to that offset.
     """
-    line_coordinates = bresenham_line(start, end)
-    for coordinates in line_coordinates[1:-1]:
+    return {Vector(dx, dy): bresenham_line(Coordinates(0, 0), Coordinates(dx, dy)) for dx in range(-radius, radius + 1) for dy in range(-radius, radius + 1)}
+
+
+def can_see(line_segment: list[Coordinates], obstacles: set[Coordinates]) -> bool:
+    """
+    Checks if the end of a line segment is visible from the start of the line segment given a set of obstacles' coordinates.
+    
+    :param line_segment: The line segment to check.
+    :param obstacles: The set of obstacles' coordinates.
+    :return: True if the end of the line segment is visible from the start of the line segment, False otherwise.
+    """
+    for coordinates in line_segment[1:-1]:
         if coordinates in obstacles:
             return False
     return True
@@ -95,10 +103,11 @@ def bresenham_line(start: Coordinates, end: Coordinates) -> list[Coordinates]:
         line_coordinates.append(current_coordinates)
         if current_coordinates == end:
             break
-        if error * 2 >= dy:
+        doubled_error = error * 2
+        if doubled_error >= dy:
             error += dy
             current_coordinates += Vector(sign_x, 0)
-        if error * 2 <= dx:
+        if doubled_error <= dx:
             error += dx
             current_coordinates += Vector(0, sign_y)
     return line_coordinates

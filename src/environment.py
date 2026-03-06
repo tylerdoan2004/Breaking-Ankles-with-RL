@@ -10,7 +10,7 @@ from minigrid.core.mission import MissionSpace
 from minigrid.core.world_object import Goal, Wall
 from minigrid.minigrid_env import MiniGridEnv
 from src.utils.environment.coordinates import Coordinates
-from src.utils.environment.helpers import calculate_observation_space, can_see, scale_absolute_coordinates, scale_relative_vector
+from src.utils.environment.helpers import calculate_observation_space, can_see, compute_offset_to_line_mapping, scale_absolute_coordinates, scale_relative_vector
 from src.utils.environment.seeker import Seeker
 from src.utils.environment.vector import Vector
 from src.utils.yaml_parser.configuration import SystemConfiguration
@@ -41,6 +41,7 @@ class ReactiveAvoidanceEnv(MiniGridEnv):
         self._current_step = 0
         self._current_agent_coordinates = config.agent.start_coordinates
         self._current_seeker_coordinates = [seeker.start_coordinates for seeker in config.seekers]
+        self._visibility_rays = compute_offset_to_line_mapping(config.agent.visibility_radius)
         current_local_observation = self._compute_local_observation()
         self._current_local_observation_history: deque[np.ndarray] = deque(maxlen = config.agent.observation_stack_depth)
         for _ in range(config.agent.observation_stack_depth):
@@ -69,20 +70,26 @@ class ReactiveAvoidanceEnv(MiniGridEnv):
         """
         visibility_radius = self.config.agent.visibility_radius
         visibility_diameter = 2 * visibility_radius + 1
+
         obstacles_coordinates = set(self.config.environment.obstacles_coordinates)
+        seeker_coordinates = set(self._current_seeker_coordinates)
+
         local_observation = np.zeros((4, visibility_diameter, visibility_diameter), dtype = np.float32)
         for dx in range(-visibility_radius, visibility_radius + 1):
             for dy in range(-visibility_radius, visibility_radius + 1):
-                current_coordinates = Coordinates(self._current_agent_coordinates.x + dx, self._current_agent_coordinates.y + dy)
-                if not can_see(self._current_agent_coordinates, current_coordinates, obstacles_coordinates):
+                current_visibility_offset = Vector(dx, dy)
+                current_cell_coordinates = self._current_agent_coordinates + current_visibility_offset
+                current_agent_offset = Vector(self._current_agent_coordinates.x, self._current_agent_coordinates.y)
+                current_visibility_ray = [coordinates + current_agent_offset for coordinates in self._visibility_rays[current_visibility_offset]]
+                if not can_see(current_visibility_ray, obstacles_coordinates):
                     local_observation[0, dx + visibility_radius, dy + visibility_radius] = 1.0
                     continue
-                if not self.config.environment.grid_dimensions.contains_coordinates(current_coordinates):
+                if not self.config.environment.grid_dimensions.contains_coordinates(current_cell_coordinates):
                     local_observation[1, dx + visibility_radius, dy + visibility_radius] = 1.0
                     continue
-                if current_coordinates in self.config.environment.obstacles_coordinates:
+                if current_cell_coordinates in obstacles_coordinates:
                     local_observation[2, dx + visibility_radius, dy + visibility_radius] = 1.0
-                if current_coordinates in self._current_seeker_coordinates:
+                if current_cell_coordinates in seeker_coordinates:
                     local_observation[3, dx + visibility_radius, dy + visibility_radius] = 1.0
         return local_observation.reshape(-1)
 
