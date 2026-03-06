@@ -3,14 +3,12 @@ This module provides the ReactiveAvoidanceEnvironment class for representing a t
 """
 import numpy as np
 from collections import deque
-from pathlib import Path
 from typing import Any, cast, Optional
 from gymnasium.spaces import Discrete
 from minigrid.core.grid import Grid  
 from minigrid.core.mission import MissionSpace
 from minigrid.core.world_object import Goal, Wall
 from minigrid.minigrid_env import MiniGridEnv
-from stable_baselines3.common.env_checker import check_env
 from src.utils.environment.coordinates import Coordinates
 from src.utils.environment.helpers import calculate_observation_space, can_see, scale_absolute_coordinates, scale_relative_vector
 from src.utils.environment.seeker import Seeker
@@ -338,28 +336,3 @@ class ReactiveAvoidanceEnv(MiniGridEnv):
             self.agent_dir,
             highlight_mask = highlight_mask
         )
-
-
-def make_env_from_yaml(yaml_file_path: str, *, render_mode: Optional[str] = None) -> ReactiveAvoidanceEnv:
-    """
-    Makes a reactive avoidance environment from a YAML file.
-    
-    :param yaml_file_path: The path to the YAML file.
-    :param render_mode: The rendering mode for the environment.
-    :return: The reactive avoidance environment.
-    """
-    config = SystemConfiguration.parse_config_file(Path(yaml_file_path))
-    environment = ReactiveAvoidanceEnv(config, render_mode)
-    return environment
-
-
-def validate_environment(yaml_file_path: str) -> None:
-    """
-    Validates a reactive avoidance environment from a YAML file.
-    
-    :param yaml_file_path: The path to the YAML file.
-    :return: None.
-    """
-    environment = make_env_from_yaml(yaml_file_path)
-    check_env(environment, warn = True)
-    environment.close()
