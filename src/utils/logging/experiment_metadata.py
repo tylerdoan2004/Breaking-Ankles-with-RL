@@ -126,6 +126,12 @@ class LoggingMetadata:
 
 
 def _make_yaml_safe(object: Any) -> Any:
+    """
+    Converts an object to a YAML-serializable representation.
+    
+    :param object: The object to convert.
+    :return: A YAML-serializable representation of the object.
+    """
     if object is None or isinstance(object, (str, int, float, bool)):
         return object
     if isinstance(object, dict):

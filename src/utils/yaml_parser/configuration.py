@@ -87,7 +87,7 @@ class EnvironmentConfiguration:
     A class for representing the configuration of a two-dimensional gridworld.
     """
     grid_dimensions: GridDimensions
-    obstacles_coordinates: list[Coordinates]
+    obstacles_coordinates: set[Coordinates]
     episode_time_limit: int
 
     @staticmethod
@@ -106,7 +106,7 @@ class EnvironmentConfiguration:
 
         return EnvironmentConfiguration(
             grid_dimensions = GridDimensions.from_tuple((environment_config["grid_dimensions"]["width"], environment_config["grid_dimensions"]["height"])),
-            obstacles_coordinates = [Coordinates.from_list(coordinates) for coordinates in environment_config["obstacles_coordinates"]],
+            obstacles_coordinates = {Coordinates.from_list(coordinates) for coordinates in environment_config["obstacles_coordinates"]},
             episode_time_limit = environment_config["episode_time_limit"]
         )
 

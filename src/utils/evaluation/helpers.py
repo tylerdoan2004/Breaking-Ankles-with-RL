@@ -3,8 +3,8 @@ This module contains helper functions for evaluation.
 """
 from pathlib import Path
 from stable_baselines3.common.evaluation import evaluate_policy
-from stable_baselines3.common.vec_env import DummyVecEnv,VecMonitor
-from src.environment import make_env_from_yaml
+from stable_baselines3.common.vec_env import DummyVecEnv, VecMonitor
+from src.utils.environment.environment_creation import make_env_from_yaml
 from src.utils.typing.agent import StableBaselines3Model
 
 

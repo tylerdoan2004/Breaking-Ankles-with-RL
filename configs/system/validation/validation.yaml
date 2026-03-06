@@ -192,16 +192,13 @@ environment:
   - [28, 21]
 
   - [29, 20]
-
-
-  # episode_time_limit: 250
   episode_time_limit: 120
 
 agent:
   start_coordinates: [28, 2]
   goal_coordinates: [1, 27]
   velocity: 1
-  visibility_radius: 5
+  visibility_radius: 3
   observation_stack_depth: 5
 
 seekers:

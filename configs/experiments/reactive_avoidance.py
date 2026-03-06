@@ -1,3 +1,6 @@
+"""
+A configuration file for a reactive avoidance experiment.
+"""
 from src.utils.logging.experiment_metadata import (
     EvaluationMetadata,
     LoggingDirectoriesMetadata,
