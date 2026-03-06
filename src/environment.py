@@ -35,8 +35,7 @@ class ReactiveAvoidanceEnv(MiniGridEnv):
             width = config.environment.grid_dimensions.width,
             height = config.environment.grid_dimensions.height,
             max_steps = config.environment.episode_time_limit,
-            # TODO: Set see_through_walls to False and handle occlusion
-            see_through_walls = True,
+            see_through_walls = False,
             render_mode = render_mode
         )
         self.config = config
