@@ -257,9 +257,14 @@ class ReactiveAvoidanceEnv(MiniGridEnv):
         :param action: The action to take in the environment.
         :return: A tuple containing the observation, reward, termination flag, truncation flag, and auxiliary info dictionary.
         """
-        # TODO: Reward shaping
         action = cast(int, action)
         self._current_step += 1
+
+        # Capture distance to goal before moving (for progress reward)
+        prev_dist_to_goal = max(
+            abs(self._current_agent_coordinates.x - self.config.agent.goal_coordinates.x),
+            abs(self._current_agent_coordinates.y - self.config.agent.goal_coordinates.y)
+        )
 
         # Move the agent
         self._current_agent_coordinates = self._move_agent(action)
@@ -282,8 +287,28 @@ class ReactiveAvoidanceEnv(MiniGridEnv):
         if self._current_agent_coordinates in self._current_seeker_coordinates:
             return self._finalize_step(reward = -1.0, terminated = True, truncated = truncated, outcome = "interception")
 
+        # Dense progress reward: positive when moving toward goal, negative when moving away
+        curr_dist_to_goal = max(
+            abs(self._current_agent_coordinates.x - self.config.agent.goal_coordinates.x),
+            abs(self._current_agent_coordinates.y - self.config.agent.goal_coordinates.y)
+        )
+        progress_reward = (prev_dist_to_goal - curr_dist_to_goal) * 0.05
+
+        # Seeker danger penalty: linear penalty within a radius of 3 cells
+        danger_penalty = 0.0
+        for seeker_coords in self._current_seeker_coordinates:
+            dist_to_seeker = max(
+                abs(self._current_agent_coordinates.x - seeker_coords.x),
+                abs(self._current_agent_coordinates.y - seeker_coords.y)
+            )
+            if dist_to_seeker < 3:
+                danger_penalty -= 0.1 * (3 - dist_to_seeker) / 3
+
+        # Step penalty to encourage efficiency
+        step_penalty = -1 / self.config.environment.episode_time_limit
+
         # Otherwise, continue the episode
-        return self._finalize_step(reward = -1 / self.config.environment.episode_time_limit, terminated = False, truncated = truncated, outcome = "timeout" if truncated else None)
+        return self._finalize_step(reward = step_penalty + progress_reward + danger_penalty, terminated = False, truncated = truncated, outcome = "timeout" if truncated else None)
 
     # def step(self, action):
 
