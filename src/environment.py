@@ -299,7 +299,7 @@ class ReactiveAvoidanceEnv(MiniGridEnv):
             # TODO: Implement other policies
             self._current_seeker_coordinates[i] = move_seeker(current_coordinates = self._current_seeker_coordinates[i],
                                                               velocity = seeker.velocity,
-                                                              policy = "greedy",
+                                                              policy = "astar",
                                                               current_agent_coordinates = self._current_agent_coordinates,
                                                               grid_dimensions = self.config.environment.grid_dimensions,
                                                               obstacles_coordinates = self.config.environment.obstacles_coordinates,

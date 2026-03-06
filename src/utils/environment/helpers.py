@@ -1,6 +1,7 @@
 """
 This module provides helper functions for the reactive avoidance environment.
 """
+import heapq
 import numpy as np
 from collections import deque
 from random import choice
@@ -220,7 +221,71 @@ def greedy_seeker_policy(legal_moves: Iterable[Vector], *,
     return choice(candidate_moves)
 
 
-def seeker_policy(policy: Literal["random", "greedy"], *,
+def astar_seeker_policy(*, current_coordinates: Coordinates, current_agent_coordinates: Coordinates,
+                        grid_dimensions: GridDimensions, obstacles_coordinates: Iterable[Coordinates],
+                        seekers_coordinates: Iterable[Coordinates]) -> Vector:
+    """
+    Uses A* pathfinding to find the next move from the seeker toward the agent, navigating around obstacles.
+    Returns the movement vector for the first step, or Vector(0,0) if no path exists.
+    
+    :param current_coordinates: The current coordinates of the seeker.
+    :param current_agent_coordinates: The current coordinates of the agent.
+    :param grid_dimensions: The grid dimensions of the environment.
+    :param obstacles_coordinates: The obstacles' coordinates.
+    :param seekers_coordinates: The other seekers' coordinates.
+    :return: The movement vector for the first step along the shortest path.
+    """
+    if current_coordinates == current_agent_coordinates:
+        return Vector(0, 0)
+
+    def heuristic(a: Coordinates, b: Coordinates) -> int:
+        return max(abs(a.x - b.x), abs(a.y - b.y))
+
+    obstacles_set = frozenset(obstacles_coordinates)
+    seekers_set = frozenset(seekers_coordinates)
+
+    # Priority queue: (f_score, tie_breaker, coordinates, first_move_vector)
+    open_set: list[tuple[int, int, Coordinates, Vector]] = []
+    tie_breaker = 0
+    heapq.heappush(open_set, (heuristic(current_coordinates, current_agent_coordinates), tie_breaker, current_coordinates, Vector(0, 0)))
+    visited: set[Coordinates] = set()
+
+    directions = [
+        Vector(0, 1), Vector(1, 0), Vector(0, -1), Vector(-1, 0),
+        Vector(1, 1), Vector(1, -1), Vector(-1, 1), Vector(-1, -1)
+    ]
+
+    while open_set:
+        f, _, current, first_move = heapq.heappop(open_set)
+        if current in visited:
+            continue
+        visited.add(current)
+
+        if current == current_agent_coordinates:
+            return first_move
+
+        g = f - heuristic(current, current_agent_coordinates)
+
+        for direction in directions:
+            neighbor = current + direction
+            if neighbor in visited:
+                continue
+            if not grid_dimensions.contains_coordinates(neighbor):
+                continue
+            if neighbor in obstacles_set:
+                continue
+            if neighbor in seekers_set:
+                continue
+            next_first_move = first_move if first_move != Vector(0, 0) else direction
+            new_g = g + 1
+            new_f = new_g + heuristic(neighbor, current_agent_coordinates)
+            tie_breaker += 1
+            heapq.heappush(open_set, (new_f, tie_breaker, neighbor, next_first_move))
+
+    return Vector(0, 0)
+
+
+def seeker_policy(policy: Literal["random", "greedy", "astar"], *,
                   current_coordinates: Coordinates, current_agent_coordinates: Coordinates,
                   grid_dimensions: GridDimensions, obstacles_coordinates: Iterable[Coordinates], seekers_coordinates: Iterable[Coordinates],
                   goal_coordinates: Coordinates) -> Vector:
@@ -236,6 +301,12 @@ def seeker_policy(policy: Literal["random", "greedy"], *,
     :param goal_coordinates: The goal coordinates.
     :return: A movement vector for a seeker.
     """
+    if policy == "astar":
+        return astar_seeker_policy(current_coordinates = current_coordinates,
+                                   current_agent_coordinates = current_agent_coordinates,
+                                   grid_dimensions = grid_dimensions,
+                                   obstacles_coordinates = obstacles_coordinates,
+                                   seekers_coordinates = seekers_coordinates)
     legal_moves = calculate_seeker_legal_moves(current_coordinates = current_coordinates,
                                                grid_dimensions = grid_dimensions, obstacles_coordinates = obstacles_coordinates, seekers_coordinates = seekers_coordinates, goal_coordinates = goal_coordinates)
     if not legal_moves:
