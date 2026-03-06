@@ -12,7 +12,7 @@ from minigrid.core.world_object import Goal, Wall
 from minigrid.minigrid_env import MiniGridEnv
 from stable_baselines3.common.env_checker import check_env
 from src.utils.environment.coordinates import Coordinates
-from src.utils.environment.helpers import calculate_observation_space, scale_absolute_coordinates, scale_relative_vector
+from src.utils.environment.helpers import calculate_observation_space, can_see, scale_absolute_coordinates, scale_relative_vector
 from src.utils.environment.seeker import Seeker
 from src.utils.environment.vector import Vector
 from src.utils.yaml_parser.configuration import SystemConfiguration
@@ -72,20 +72,21 @@ class ReactiveAvoidanceEnv(MiniGridEnv):
         """
         visibility_radius = self.config.agent.visibility_radius
         visibility_diameter = 2 * visibility_radius + 1
-        # TODO: Add two channels: whether the agent observes an out-of-bounds cell and whether the agent observes an occluded cell
-        # TODO: If the agent observes an occluded cell, all other channels should be set to 0
-        local_observation = np.zeros((3, visibility_diameter, visibility_diameter), dtype = np.float32)
+        obstacles_coordinates = set(self.config.environment.obstacles_coordinates)
+        local_observation = np.zeros((4, visibility_diameter, visibility_diameter), dtype = np.float32)
         for dx in range(-visibility_radius, visibility_radius + 1):
             for dy in range(-visibility_radius, visibility_radius + 1):
                 current_coordinates = Coordinates(self._current_agent_coordinates.x + dx, self._current_agent_coordinates.y + dy)
+                if not can_see(self._current_agent_coordinates, current_coordinates, obstacles_coordinates):
+                    local_observation[0, dx + visibility_radius, dy + visibility_radius] = 1.0
+                    continue
                 if not self.config.environment.grid_dimensions.contains_coordinates(current_coordinates):
+                    local_observation[1, dx + visibility_radius, dy + visibility_radius] = 1.0
                     continue
                 if current_coordinates in self.config.environment.obstacles_coordinates:
-                    local_observation[0, dx + visibility_radius, dy + visibility_radius] = 1.0
-                if current_coordinates in self._current_seeker_coordinates:
-                    local_observation[1, dx + visibility_radius, dy + visibility_radius] = 1.0
-                if current_coordinates == self.config.agent.goal_coordinates:
                     local_observation[2, dx + visibility_radius, dy + visibility_radius] = 1.0
+                if current_coordinates in self._current_seeker_coordinates:
+                    local_observation[3, dx + visibility_radius, dy + visibility_radius] = 1.0
         return local_observation.reshape(-1)
 
     def _get_obs(self) -> np.ndarray:
@@ -284,69 +285,6 @@ class ReactiveAvoidanceEnv(MiniGridEnv):
 
         # Otherwise, continue the episode
         return self._finalize_step(reward = -1 / self.config.environment.episode_time_limit, terminated = False, truncated = truncated, outcome = "timeout" if truncated else None)
-
-    # def step(self, action):
-
-    #     if isinstance(action, np.ndarray):
-    #         action = int(action.item())
-
-    #     # Get movement direction
-    #     direction = self.action_map[action]
-
-    #     # Calculate new position
-    #     new_pos = (
-    #         self.agent_pos[0] + direction[0],
-    #         self.agent_pos[1] + direction[1]
-    #     )
-
-    #     # Clip to grid boundaries
-    #     new_pos = (
-    #         int(np.clip(new_pos[0], 0, self.width - 1)),
-    #         int(np.clip(new_pos[1], 0, self.height - 1))
-    #     )
-
-    #     prev_dist = np.linalg.norm(np.array(self.agent_pos) - np.array(self.goal_pos))
-
-    #     # Check if cell is passable (seekers have can_overlap=True, so agent can step on them)
-    #     cell = self.grid.get(*new_pos)
-    #     if cell is None or cell.can_overlap():
-    #         self.agent_pos = new_pos
-        
-    #     # Increment step counter
-    #     self.step_count += 1
-
-    #     # Move seekers toward the agent after the agent moves
-    #     self._move_seekers()
-
-    #     # Check if a seeker caught the agent
-    #     if self._seeker_caught_agent():
-    #         observation = self.gen_obs()
-    #         return observation, -100.0, True, False, {}
-
-    #     # Check if reached goal
-    #     if tuple(self.agent_pos) == self.goal_pos:
-    #         reward = 100.0
-    #         terminated = True
-    #     else:
-    #         curr_dist = np.linalg.norm(np.array(self.agent_pos) - np.array(self.goal_pos))
-    #         dist_reward = (prev_dist - curr_dist) * 0.5
-
-    #         # Proximity bonus using inverse distance so it spikes sharply when
-    #         # adjacent to the goal (~8.0 at dist=1), overwhelming any seeker-fear
-    #         # and preventing oscillation. Falls to ~0 beyond 5 cells.
-    #         if curr_dist < 5.0:
-    #             proximity_bonus = min(8.0, 8.0 / max(curr_dist, 0.5)) - 1.6
-    #         else:
-    #             proximity_bonus = 0.0
-
-    #         reward = -0.1 + dist_reward + proximity_bonus
-    #         terminated = False
-
-    #     # Check if max steps reached
-    #     truncated = self.step_count >= self.max_steps
-
-    #     observation = self.gen_obs()
-    #     return observation, reward, terminated, truncated, {}
 
     def get_full_render(self, highlight: bool = True, tile_size: Optional[int] = None) -> np.ndarray:
         """

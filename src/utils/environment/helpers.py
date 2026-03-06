@@ -56,3 +56,48 @@ def scale_relative_vector(vector: Vector, grid_width: int, grid_height: int) -> 
     scaled_x_component = vector.x / max(1, grid_width - 1)
     scaled_y_component = vector.y / max(1, grid_height - 1)
     return np.array([scaled_x_component, scaled_y_component], dtype = np.float32)
+
+
+def can_see(start: Coordinates, end: Coordinates, obstacles: set[Coordinates]) -> bool:
+    """
+    Checks if the end coordinates can be seen from the start coordinates given the obstacles' coordinates.
+    
+    :param start: The starting coordinates.
+    :param end: The ending coordinates.
+    :param obstacles: The obstacles' coordinates.
+    :return: True if the end coordinates can be seen from the start coordinates given the obstacles' coordinates, False otherwise.
+    """
+    line_coordinates = bresenham_line(start, end)
+    for coordinates in line_coordinates[1:-1]:
+        if coordinates in obstacles:
+            return False
+    return True
+
+
+def bresenham_line(start: Coordinates, end: Coordinates) -> list[Coordinates]:
+    """
+    Generates a list of coordinates representing a line segment using the Bresenham algorithm.
+    
+    :param start: The starting coordinates of the line segment.
+    :param end: The ending coordinates of the line segment.
+    :return: A list of coordinates representing the line segment.
+    """
+    dx = abs(end.x - start.x)
+    dy = -abs(end.y - start.y)
+    sign_x = 1 if start.x < end.x else -1
+    sign_y = 1 if start.y < end.y else -1
+    error = dx + dy
+
+    line_coordinates = []
+    current_coordinates = start
+    while True:
+        line_coordinates.append(current_coordinates)
+        if current_coordinates == end:
+            break
+        if error * 2 >= dy:
+            error += dy
+            current_coordinates += Vector(sign_x, 0)
+        if error * 2 <= dx:
+            error += dx
+            current_coordinates += Vector(0, sign_y)
+    return line_coordinates
