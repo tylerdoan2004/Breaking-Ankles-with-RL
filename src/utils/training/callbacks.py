@@ -14,7 +14,10 @@ class VideoCallback(BaseCallback):
     """
     A callback for recording a video of a single episode of an agent performing actions in an environment.
     """
-    def __init__(self, *, video_directory: str, video_name_prefix: str, environment_factory: VideoRecordableEnvironmentFactory, seed: int, recording_frequency: int, verbose: int = 0) -> None:
+    def __init__(self, *, video_directory: str, video_name_prefix: str,
+                 environment_factory: VideoRecordableEnvironmentFactory, seed: int,
+                 recording_frequency: int,
+                 verbose: int = 0) -> None:
         """
         Initializes the VideoCallback object.
         
