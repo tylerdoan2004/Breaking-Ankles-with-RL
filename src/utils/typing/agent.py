@@ -1,5 +1,5 @@
 """
-A module for typing agents.
+A module for statically type-checking agents.
 """
 from typing import Any, Generic, Protocol, TypeVar
 
@@ -23,7 +23,7 @@ class Agent(Protocol[ProtocolObsType, ProtocolActType]):
 
 class StableBaselines3Model(Protocol[ProtocolObsType, ProtocolActType]):
     """
-    A protocol for representing a Stable Baselines 3 model.
+    A protocol for representing a Stable Baselines3 model.
     """
     def predict(self, observation: ProtocolObsType, state: Any = None, episode_start: Any = None, deterministic: bool = False) -> tuple[ProtocolActType, Any]:
         """
@@ -40,7 +40,7 @@ ObsType = TypeVar("ObsType")
 ActType = TypeVar("ActType")
 class StableBaselines3Agent(Generic[ObsType, ActType]):
     """
-    A class for representing a Stable Baselines 3 agent.
+    A class for representing a Stable Baselines3 agent.
     """
     def __init__(self, model: StableBaselines3Model[ObsType, ActType]) -> None:
         """
