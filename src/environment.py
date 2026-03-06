@@ -13,6 +13,7 @@ from src.utils.environment.coordinates import Coordinates
 from src.utils.environment.helpers import (
     calculate_observation_space,
     can_see,
+    chebyshev_distance,
     compute_offset_to_line_mapping,
     compute_time_steps_to_goal_mapping,
     scale_absolute_coordinates,
@@ -207,11 +208,8 @@ class ReactiveAvoidanceEnv(MiniGridEnv):
         self._current_step += 1
         truncated = self._current_step >= self.config.environment.episode_time_limit
 
-        # Capture distance to goal before moving (for progress reward)
-        prev_dist_to_goal = max(
-            abs(self._current_agent_coordinates.x - self.config.agent.goal_coordinates.x),
-            abs(self._current_agent_coordinates.y - self.config.agent.goal_coordinates.y)
-        )
+        # Compute time steps to goal before moving
+        previous_time_steps_to_goal = self._time_steps_to_goal_mapping.get(self._current_agent_coordinates)
 
         # Move the agent in the environment
         self._current_agent_coordinates, collided, goal = move_agent(current_coordinates = self._current_agent_coordinates,
@@ -223,11 +221,12 @@ class ReactiveAvoidanceEnv(MiniGridEnv):
                                                                      goal_coordinates = self.config.agent.goal_coordinates)
         # Update the agent's position in the grid
         self.agent_pos = (self._current_agent_coordinates.x, self._current_agent_coordinates.y)
+
         # If moving the agent results in a collision or the goal, return the current observation and terminate the episode
         if collided:
-            return self._finalize_step(reward = -1.0, terminated = True, truncated = truncated, outcome = "collision")
+            return self._finalize_step(reward = -5, terminated = True, truncated = truncated, outcome = "collision")
         if goal:
-            return self._finalize_step(reward = 1.0, terminated = True, truncated = truncated, outcome = "goal")
+            return self._finalize_step(reward = 5, terminated = True, truncated = truncated, outcome = "goal")
 
         # Clear the seekers' positions in the grid
         for coordinates in self._current_seeker_coordinates:
@@ -250,25 +249,23 @@ class ReactiveAvoidanceEnv(MiniGridEnv):
 
         # If moving the seekers results in an interception, return the current observation and terminate the episode
         if self._current_agent_coordinates in self._current_seeker_coordinates:
-            return self._finalize_step(reward = -1.0, terminated = True, truncated = truncated, outcome = "interception")
+            return self._finalize_step(reward = -5, terminated = True, truncated = truncated, outcome = "interception")
 
-        # Dense progress reward: positive when moving toward goal, negative when moving away
-        curr_dist_to_goal = max(
-            abs(self._current_agent_coordinates.x - self.config.agent.goal_coordinates.x),
-            abs(self._current_agent_coordinates.y - self.config.agent.goal_coordinates.y)
-        )
-        progress_reward = (prev_dist_to_goal - curr_dist_to_goal) * 0.05
+        # Compute time steps to goal after moving
+        current_time_steps_to_goal = self._time_steps_to_goal_mapping.get(self._current_agent_coordinates)
 
-        # Seeker danger penalty: linear penalty within a radius of 3 cells
+        # Compute progress reward
+        if previous_time_steps_to_goal is None or current_time_steps_to_goal is None:
+            progress_reward = 0.0
+        else:
+            # TODO: Implement coefficient for progress reward
+            progress_reward = (previous_time_steps_to_goal - current_time_steps_to_goal) * 0.05
+        # Linear danger penalty within a Chebyshevradius of 3 cells
         danger_penalty = 0.0
-        for seeker_coords in self._current_seeker_coordinates:
-            dist_to_seeker = max(
-                abs(self._current_agent_coordinates.x - seeker_coords.x),
-                abs(self._current_agent_coordinates.y - seeker_coords.y)
-            )
-            if dist_to_seeker < 3:
-                danger_penalty -= 0.1 * (3 - dist_to_seeker) / 3
-
+        for seeker_coordinates in self._current_seeker_coordinates:
+            distance_to_seeker = chebyshev_distance(self._current_agent_coordinates, seeker_coordinates)
+            if distance_to_seeker < 3:
+                danger_penalty -= 0.1 * (3 - distance_to_seeker) / 3
         # Step penalty to encourage efficiency
         step_penalty = -1 / self.config.environment.episode_time_limit
 
