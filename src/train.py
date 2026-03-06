@@ -176,6 +176,7 @@ def main():
     print("Video recorded.")
 
     print("Evaluating best PPO agent on in-distribution environment...")
+    print()
     # Evaluate the best PPO agent on the in-distribution evaluation environment
     evaluate_agent(
         model = best_model,
@@ -185,6 +186,7 @@ def main():
         n_episodes = experiment_metadata.logging.episodes_per_evaluation,
         metrics_directory = experiment_directory / "evaluation/in_distribution/metrics"
     )
+    print()
     print("Evaluation complete.")
     print("Recording video of best PPO agent's actions in the in-distribution evaluation environment...")
     # Record a video of one episode of the best PPO agent's actions in the in-distribution evaluation environment
@@ -197,6 +199,7 @@ def main():
     )
     print("Video recorded.")
     print("Evaluating best PPO agent on out-of-distribution environment...")
+    print()
     # Evaluate the best PPO agent on the out-of-distribution evaluation environment
     evaluate_agent(
         model = best_model,
@@ -206,6 +209,7 @@ def main():
         n_episodes = experiment_metadata.logging.episodes_per_evaluation,
         metrics_directory = experiment_directory / "evaluation/out_of_distribution/metrics"
     )
+    print()
     print("Evaluation complete.")
     print("Recording video of best PPO agent's actions in the out-of-distribution evaluation environment...")
     # Record a video of one episode of the best PPO agent's actions in the out-of-distribution evaluation environment
