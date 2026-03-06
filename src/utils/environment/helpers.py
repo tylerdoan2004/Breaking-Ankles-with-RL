@@ -82,6 +82,7 @@ def bresenham_line(start: Coordinates, end: Coordinates) -> list[Coordinates]:
     :param end: The ending coordinates of the line segment.
     :return: A list of coordinates representing the line segment.
     """
+    # NOTE: This Bresenham algorithm implementation permits diagonal lines
     dx = abs(end.x - start.x)
     dy = -abs(end.y - start.y)
     sign_x = 1 if start.x < end.x else -1
