@@ -2,8 +2,8 @@ version: 1
 
 environment:
   grid_dimensions:
-    width: 10
-    height: 10
+    width: 30
+    height: 30
   obstacles_coordinates:
   - [0, 4]
   - [0, 11]
@@ -146,7 +146,7 @@ environment:
   - [29, 26]
 
   # episode_time_limit: 250
-  episode_time_limit: 50
+  episode_time_limit: 120
 
 agent:
   start_coordinates: [27, 3]
