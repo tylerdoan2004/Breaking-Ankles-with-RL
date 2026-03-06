@@ -2,8 +2,11 @@
 This module provides helper functions for the reactive avoidance environment.
 """
 import numpy as np
+from random import choice
+from typing import Iterable, Literal
 from gymnasium.spaces import Box
 from src.utils.environment.coordinates import Coordinates
+from src.utils.environment.grid_dimensions import GridDimensions
 from src.utils.environment.vector import Vector
 
 
@@ -68,12 +71,12 @@ def compute_offset_to_line_mapping(radius: int) -> dict[Vector, list[Coordinates
     return {Vector(dx, dy): bresenham_line(Coordinates(0, 0), Coordinates(dx, dy)) for dx in range(-radius, radius + 1) for dy in range(-radius, radius + 1)}
 
 
-def can_see(line_segment: list[Coordinates], obstacles: set[Coordinates]) -> bool:
+def can_see(line_segment: list[Coordinates], obstacles: Iterable[Coordinates]) -> bool:
     """
     Checks if the end of a line segment is visible from the start of the line segment given a set of obstacles' coordinates.
     
     :param line_segment: The line segment to check.
-    :param obstacles: The set of obstacles' coordinates.
+    :param obstacles: The obstacles' coordinates.
     :return: True if the end of the line segment is visible from the start of the line segment, False otherwise.
     """
     for coordinates in line_segment[1:-1]:
@@ -111,3 +114,161 @@ def bresenham_line(start: Coordinates, end: Coordinates) -> list[Coordinates]:
             error += dx
             current_coordinates += Vector(0, sign_y)
     return line_coordinates
+
+
+def can_entity_be_in(coordinates: Coordinates, *, grid_dimensions: GridDimensions, obstacles_coordinates: Iterable[Coordinates], seekers_coordinates: Iterable[Coordinates]) -> bool:
+    """
+    Checks if an entity can be in the given coordinates.
+    
+    :param coordinates: The coordinates to check.
+    :param grid_dimensions: The grid dimensions.
+    :param obstacles_coordinates: The obstacles' coordinates.
+    :param seekers_coordinates: The seekers' coordinates.
+    :return: True if the entity can be in the given coordinates, False otherwise.
+    """
+    if not grid_dimensions.contains_coordinates(coordinates):
+        return False
+    if coordinates in obstacles_coordinates:
+        return False
+    if coordinates in seekers_coordinates:
+        return False
+    return True
+
+
+# TODO: Use this function for validation logic
+def move_agent(*,
+               current_coordinates: Coordinates, velocity: int, movement_vector: Vector,
+               grid_dimensions: GridDimensions, obstacles_coordinates: Iterable[Coordinates], seekers_coordinates: Iterable[Coordinates],
+               goal_coordinates: Coordinates) -> tuple[Coordinates, bool, bool]:
+    """
+    Moves the agent in the environment based on its current coordinates, velocity, and action.
+    
+    :param current_coordinates: The current coordinates of the agent.
+    :param velocity: The velocity of the agent.
+    :param movement_vector: The movement vector associated with the agent's action.
+    :param grid_dimensions: The grid dimensions of the environment.
+    :param obstacles_coordinates: The obstacles' coordinates.
+    :param seekers_coordinates: The seekers' coordinates.
+    :param goal_coordinates: The goal coordinates.
+    :return: A tuple containing the final coordinates of the agent, whether the agent collided (out-of-bounds, obstacle, or seeker), and whether the agent reached the goal.
+    """
+    # NOTE: This movement allows the agent to slip through diagonal obstacles
+    intermediate_coordinates = current_coordinates
+    for _ in range(velocity):
+        intermediate_coordinates += movement_vector
+        if not can_entity_be_in(intermediate_coordinates, grid_dimensions = grid_dimensions, obstacles_coordinates = obstacles_coordinates, seekers_coordinates = seekers_coordinates):
+            return intermediate_coordinates, True, False
+        if intermediate_coordinates == goal_coordinates:
+            return intermediate_coordinates, False, True
+    return intermediate_coordinates, False, False
+
+
+def calculate_seeker_legal_moves(*,
+                                 current_coordinates: Coordinates,
+                                 grid_dimensions: GridDimensions, obstacles_coordinates: Iterable[Coordinates], seekers_coordinates: Iterable[Coordinates],
+                                 goal_coordinates: Coordinates) -> list[Vector]:
+    """
+    Computes the legal moves for a seeker.
+    
+    :param current_coordinates: The current coordinates of the seeker.
+    :param grid_dimensions: The grid dimensions of the environment.
+    :param obstacles_coordinates: The obstacles' coordinates.
+    :param seekers_coordinates: The seekers' coordinates.
+    :param goal_coordinates: The goal coordinates.
+    :return: A list of legal moves for a seeker.
+    """
+    # The seeker may always choose not to move
+    legal_moves = [Vector(0, 0)]
+    for movement_vector in (Vector(0, 1), Vector(1, 0), Vector(0, -1), Vector(-1, 0), Vector(1, 1), Vector(1, -1), Vector(-1, 1), Vector(-1, -1)):
+        # Seekers may not collide with obstacles, other seekers, or out-of-bounds coordinates
+        if not can_entity_be_in(current_coordinates + movement_vector,
+                                grid_dimensions = grid_dimensions, obstacles_coordinates = obstacles_coordinates, seekers_coordinates = seekers_coordinates):
+            continue
+        # Seekers may not collide with the goal
+        if current_coordinates + movement_vector == goal_coordinates:
+            continue
+        legal_moves.append(movement_vector)
+    return legal_moves
+
+
+def chebyshev_distance(first_coordinates: Coordinates, second_coordinates: Coordinates) -> int:
+    """
+    Computes the Chebychev distance between two coordinates.
+    
+    :param first_coordinates: The first pair of coordinates.
+    :param second_coordinates: The second pair of coordinates.
+    :return: The Chebychev distance between the two coordinates.
+    """
+    return max(abs(first_coordinates.x - second_coordinates.x), abs(first_coordinates.y - second_coordinates.y))
+
+
+def greedy_seeker_policy(legal_moves: Iterable[Vector], *,
+                         current_coordinates: Coordinates,
+                         current_agent_coordinates: Coordinates) -> Vector:
+    """
+    Computes the legal move that minimizes the Chebychev distance to the agent. Breaks ties uniformly at random.
+    
+    :param legal_moves: The legal moves for a seeker.
+    :param current_coordinates: The current coordinates of the seeker.
+    :param current_agent_coordinates: The current coordinates of the agent.
+    :return: A legal move that minimizes the Chebychev distance to the agent.
+    """
+    legal_moves = list(legal_moves)
+    minimum_distance = min(chebyshev_distance(current_coordinates + movement_vector, current_agent_coordinates) for movement_vector in legal_moves)
+    candidate_moves = [movement_vector for movement_vector in legal_moves if chebyshev_distance(current_coordinates + movement_vector, current_agent_coordinates) == minimum_distance]
+    return choice(candidate_moves)
+
+
+def seeker_policy(policy: Literal["random", "greedy"], *,
+                  current_coordinates: Coordinates, current_agent_coordinates: Coordinates,
+                  grid_dimensions: GridDimensions, obstacles_coordinates: Iterable[Coordinates], seekers_coordinates: Iterable[Coordinates],
+                  goal_coordinates: Coordinates) -> Vector:
+    """
+    Chooses a movement vector for a seeker.
+    
+    :param policy: The policy to use for choosing the movement vector.
+    :param current_coordinates: The current coordinates of the seeker.
+    :param current_agent_coordinates: The current coordinates of the agent.
+    :param grid_dimensions: The grid dimensions of the environment.
+    :param obstacles_coordinates: The obstacles' coordinates.
+    :param seekers_coordinates: The seekers' coordinates.
+    :param goal_coordinates: The goal coordinates.
+    :return: A movement vector for a seeker.
+    """
+    legal_moves = calculate_seeker_legal_moves(current_coordinates = current_coordinates,
+                                               grid_dimensions = grid_dimensions, obstacles_coordinates = obstacles_coordinates, seekers_coordinates = seekers_coordinates, goal_coordinates = goal_coordinates)
+    if not legal_moves:
+        return Vector(0, 0)
+    if policy == "random":
+        return choice(legal_moves)
+    if policy == "greedy":
+        return greedy_seeker_policy(legal_moves,
+                                    current_coordinates = current_coordinates,
+                                    current_agent_coordinates = current_agent_coordinates)
+    raise ValueError(f"Unsupported seeker policy: {policy}")
+
+
+def move_seeker(*,
+                current_coordinates: Coordinates, velocity: int,
+                policy: Literal["random", "greedy"] = "greedy", current_agent_coordinates: Coordinates,
+                grid_dimensions: GridDimensions, obstacles_coordinates: Iterable[Coordinates], seekers_coordinates: Iterable[Coordinates], goal_coordinates: Coordinates) -> Coordinates:
+    """
+    Moves the seeker in the environment based on its current coordinates, velocity, and policy.
+    
+    :param current_coordinates: The current coordinates of the seeker.
+    :param velocity: The velocity of the seeker.
+    :param policy: The policy to use for choosing the movement vector.
+    :param current_agent_coordinates: The current coordinates of the agent.
+    :param grid_dimensions: The grid dimensions of the environment.
+    :param obstacles_coordinates: The obstacles' coordinates.
+    :param seekers_coordinates: The seekers' coordinates.
+    :param goal_coordinates: The goal coordinates.
+    :return: The final coordinates of the seeker.
+    """
+    intermediate_coordinates = current_coordinates
+    for _ in range(velocity):
+        movement_vector = seeker_policy(policy,
+                                        current_coordinates = intermediate_coordinates, current_agent_coordinates = current_agent_coordinates,
+                                        grid_dimensions = grid_dimensions, obstacles_coordinates = obstacles_coordinates, seekers_coordinates = seekers_coordinates, goal_coordinates = goal_coordinates)
+        intermediate_coordinates += movement_vector
+    return intermediate_coordinates

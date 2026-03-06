@@ -10,7 +10,7 @@ from minigrid.core.mission import MissionSpace
 from minigrid.core.world_object import Goal, Wall
 from minigrid.minigrid_env import MiniGridEnv
 from src.utils.environment.coordinates import Coordinates
-from src.utils.environment.helpers import calculate_observation_space, can_see, compute_offset_to_line_mapping, scale_absolute_coordinates, scale_relative_vector
+from src.utils.environment.helpers import calculate_observation_space, can_see, compute_offset_to_line_mapping, scale_absolute_coordinates, scale_relative_vector, move_agent, move_seeker
 from src.utils.environment.seeker import Seeker
 from src.utils.environment.vector import Vector
 from src.utils.yaml_parser.configuration import SystemConfiguration
@@ -37,11 +37,14 @@ class ReactiveAvoidanceEnv(MiniGridEnv):
             render_mode = render_mode
         )
         self.config = config
+        # Compute caches
+        self._visibility_rays = compute_offset_to_line_mapping(config.agent.visibility_radius)
+        # self._time_steps_to_goal_mapping = compute_time_steps_to_goal_mapping()
+        
         # Initialize the internal dynamic components of the environment state
         self._current_step = 0
         self._current_agent_coordinates = config.agent.start_coordinates
         self._current_seeker_coordinates = [seeker.start_coordinates for seeker in config.seekers]
-        self._visibility_rays = compute_offset_to_line_mapping(config.agent.visibility_radius)
         current_local_observation = self._compute_local_observation()
         self._current_local_observation_history: deque[np.ndarray] = deque(maxlen = config.agent.observation_stack_depth)
         for _ in range(config.agent.observation_stack_depth):
@@ -71,7 +74,6 @@ class ReactiveAvoidanceEnv(MiniGridEnv):
         visibility_radius = self.config.agent.visibility_radius
         visibility_diameter = 2 * visibility_radius + 1
 
-        obstacles_coordinates = set(self.config.environment.obstacles_coordinates)
         seeker_coordinates = set(self._current_seeker_coordinates)
 
         local_observation = np.zeros((4, visibility_diameter, visibility_diameter), dtype = np.float32)
@@ -81,13 +83,13 @@ class ReactiveAvoidanceEnv(MiniGridEnv):
                 current_cell_coordinates = self._current_agent_coordinates + current_visibility_offset
                 current_agent_offset = Vector(self._current_agent_coordinates.x, self._current_agent_coordinates.y)
                 current_visibility_ray = [coordinates + current_agent_offset for coordinates in self._visibility_rays[current_visibility_offset]]
-                if not can_see(current_visibility_ray, obstacles_coordinates):
+                if not can_see(current_visibility_ray, self.config.environment.obstacles_coordinates):
                     local_observation[0, dx + visibility_radius, dy + visibility_radius] = 1.0
                     continue
                 if not self.config.environment.grid_dimensions.contains_coordinates(current_cell_coordinates):
                     local_observation[1, dx + visibility_radius, dy + visibility_radius] = 1.0
                     continue
-                if current_cell_coordinates in obstacles_coordinates:
+                if current_cell_coordinates in self.config.environment.obstacles_coordinates:
                     local_observation[2, dx + visibility_radius, dy + visibility_radius] = 1.0
                 if current_cell_coordinates in seeker_coordinates:
                     local_observation[3, dx + visibility_radius, dy + visibility_radius] = 1.0
@@ -167,81 +169,6 @@ class ReactiveAvoidanceEnv(MiniGridEnv):
         for obstacle in self.config.environment.obstacles_coordinates:
             self.grid.set(obstacle.x, obstacle.y, Wall())
 
-    def _can_agent_be_in(self, coordinates: Coordinates) -> bool:
-        """
-        Checks if the agent can be in the given coordinates.
-        
-        :param coordinates: The coordinates to check.
-        :return: True if the agent can be in the given coordinates, False otherwise.
-        """
-        if not self.config.environment.grid_dimensions.contains_coordinates(coordinates):
-            return False
-        if coordinates in self.config.environment.obstacles_coordinates:
-            return False
-        if coordinates in self._current_seeker_coordinates:
-            return False
-        return True
-
-    def _move_agent(self, action: int) -> Coordinates:
-        """
-        Moves the agent in the environment based on the given action.
-        
-        :param action: The action to take in the environment.
-        :return: The new coordinates of the agent.
-        """
-        movement_vector = self._action_map[action]
-        for _ in range(self.config.agent.velocity):
-            # Move the agent in the selected direction
-            # NOTE: This movement allows the agent to 'slip' through diagonal obstacles
-            # TODO: Create shared motion logic between environment and validator
-            self._current_agent_coordinates += movement_vector
-            # If the agent cannot be in the new coordinates or if the agent has reached the goal, return the new coordinates
-            if not self._can_agent_be_in(self._current_agent_coordinates) or self._current_agent_coordinates == self.config.agent.goal_coordinates:
-                # Update the agent's coordinates in the grid
-                self.agent_pos = (self._current_agent_coordinates.x, self._current_agent_coordinates.y)
-                return self._current_agent_coordinates
-        # Update the agent's coordinates in the grid
-        self.agent_pos = (self._current_agent_coordinates.x, self._current_agent_coordinates.y)
-        # Return the final coordinates
-        return self._current_agent_coordinates
-
-    def _seeker_policy(self, current_coordinates: Coordinates, current_agent_coordinates: Coordinates) -> Vector:
-        """
-        Returns the movement vector that minimizes the Chebyshev distance between the seeker and the agent.
-        
-        :param current_coordinates: The current coordinates of the seeker.
-        :param current_agent_coordinates: The current coordinates of the agent.
-        :return: The movement vector that minimizes the Chebyshev distance between the seeker and the agent.
-        """
-        return Vector(
-            np.sign(current_agent_coordinates.x - current_coordinates.x).astype(int),
-            np.sign(current_agent_coordinates.y - current_coordinates.y).astype(int)
-        )
-
-    def _move_seeker(self, current_coordinates: Coordinates, velocity: int) -> Coordinates:
-        """
-        Moves the seeker in the environment based on its current coordinates and velocity.  The seeker picks the action that minimizes Chebyshev distance to the agent.
-        
-        :param current_coordinates: The current coordinates of the seeker.
-        :param velocity: The velocity of the seeker.
-        :return: The new coordinates of the seeker.
-        """
-        # Remove the old seeker from the grid
-        self.grid.set(current_coordinates.x, current_coordinates.y, None)
-        for _ in range(velocity):
-            movement_vector = self._seeker_policy(current_coordinates, self._current_agent_coordinates)
-            new_coordinates = current_coordinates + movement_vector
-            # If the seeker cannot be in the new coordinates or if the new coordinates are the goal coordinates, return the old coordinates
-            if not self._can_agent_be_in(new_coordinates) or new_coordinates == self.config.agent.goal_coordinates:
-                # Update the seeker's coordinates in the grid
-                self.grid.set(current_coordinates.x, current_coordinates.y, Seeker())
-                return current_coordinates
-            # Otherwise, move the seeker in the selected direction
-            current_coordinates += movement_vector
-        # Update the seeker's coordinates in the grid
-        self.grid.set(current_coordinates.x, current_coordinates.y, Seeker())
-        return current_coordinates
-
     def _finalize_step(self, *, reward: float, terminated: bool, truncated: bool, outcome: Optional[str]) -> tuple[np.ndarray, float, bool, bool, dict[str, Any]]:
         """
         Finalizes the step in the environment. Computes and appends the agent's local observation to the local observation history. Returns a tuple containing the observation, reward, termination flag, truncation flag, and auxiliary info dictionary.
@@ -264,6 +191,7 @@ class ReactiveAvoidanceEnv(MiniGridEnv):
         """
         action = cast(int, action)
         self._current_step += 1
+        truncated = self._current_step >= self.config.environment.episode_time_limit
 
         # Capture distance to goal before moving (for progress reward)
         prev_dist_to_goal = max(
@@ -271,22 +199,40 @@ class ReactiveAvoidanceEnv(MiniGridEnv):
             abs(self._current_agent_coordinates.y - self.config.agent.goal_coordinates.y)
         )
 
-        # Move the agent
-        self._current_agent_coordinates = self._move_agent(action)
-
-        truncated = self._current_step >= self.config.environment.episode_time_limit
-
-        # If moving the agent results in a collision, return the current observation and terminate the episode
-        if not self._can_agent_be_in(self._current_agent_coordinates):
+        # Move the agent in the environment
+        self._current_agent_coordinates, collided, goal = move_agent(current_coordinates = self._current_agent_coordinates,
+                                                                     velocity = self.config.agent.velocity,
+                                                                     movement_vector = self._action_map[action],
+                                                                     grid_dimensions = self.config.environment.grid_dimensions,
+                                                                     obstacles_coordinates = self.config.environment.obstacles_coordinates,
+                                                                     seekers_coordinates = self._current_seeker_coordinates,
+                                                                     goal_coordinates = self.config.agent.goal_coordinates)
+        # Update the agent's position in the grid
+        self.agent_pos = (self._current_agent_coordinates.x, self._current_agent_coordinates.y)
+        # If moving the agent results in a collision or the goal, return the current observation and terminate the episode
+        if collided:
             return self._finalize_step(reward = -1.0, terminated = True, truncated = truncated, outcome = "collision")
-
-        # If moving the agent results in reaching the goal, return the current observation and terminate the episode
-        if self._current_agent_coordinates == self.config.agent.goal_coordinates:
+        if goal:
             return self._finalize_step(reward = 1.0, terminated = True, truncated = truncated, outcome = "goal")
 
-        # Move the seekers
+        # Clear the seekers' positions in the grid
+        for coordinates in self._current_seeker_coordinates:
+            self.grid.set(coordinates.x, coordinates.y, None)
+        # Move the seekers in the environment
         for i, seeker in enumerate(self.config.seekers):
-            self._current_seeker_coordinates[i] = self._move_seeker(self._current_seeker_coordinates[i], seeker.velocity)
+            other_seekers_coordinates = self._current_seeker_coordinates[:i] + self._current_seeker_coordinates[i+1:]
+            # TODO: Implement other policies
+            self._current_seeker_coordinates[i] = move_seeker(current_coordinates = self._current_seeker_coordinates[i],
+                                                              velocity = seeker.velocity,
+                                                              policy = "greedy",
+                                                              current_agent_coordinates = self._current_agent_coordinates,
+                                                              grid_dimensions = self.config.environment.grid_dimensions,
+                                                              obstacles_coordinates = self.config.environment.obstacles_coordinates,
+                                                              seekers_coordinates = other_seekers_coordinates,
+                                                              goal_coordinates = self.config.agent.goal_coordinates)
+        # Update the seekers' positions in the grid
+        for coordinates in self._current_seeker_coordinates:
+            self.grid.set(coordinates.x, coordinates.y, Seeker())
 
         # If moving the seekers results in an interception, return the current observation and terminate the episode
         if self._current_agent_coordinates in self._current_seeker_coordinates:
