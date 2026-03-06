@@ -144,19 +144,17 @@ environment:
   - [29, 9]
   - [29, 17]
   - [29, 26]
-
-  # episode_time_limit: 250
   episode_time_limit: 120
 
 agent:
   start_coordinates: [27, 3]
   goal_coordinates: [2, 26]
   velocity: 1
-  visibility_radius: 5
+  visibility_radius: 3
   observation_stack_depth: 5
 
 seekers:
-  - start_coordinates:  [8, 20]
+  - start_coordinates: [8, 20]
     velocity: 1
   - start_coordinates: [19, 12]
     velocity: 1

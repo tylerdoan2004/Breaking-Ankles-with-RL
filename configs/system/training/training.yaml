@@ -191,7 +191,7 @@ environment:
   - [28, 18]
   - [28, 21]
 
-  - [29,19]
+  - [29, 19]
   episode_time_limit: 120
 
 agent:
