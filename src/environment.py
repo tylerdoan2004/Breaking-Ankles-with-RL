@@ -19,7 +19,8 @@ from src.utils.environment.helpers import (
     scale_absolute_coordinates,
     scale_relative_vector,
     move_agent,
-    move_seeker
+    move_seeker,
+    MOVEMENT_VECTORS
 )
 from src.utils.environment.seeker import Seeker
 from src.utils.environment.vector import Vector
@@ -67,18 +68,8 @@ class ReactiveAvoidanceEnv(MiniGridEnv):
             self._current_local_observation_history.append(current_local_observation)
 
         # Override the default action space and observation space
-        self.action_space = Discrete(9)
-        self._action_map = {
-            0: Vector(0, 0),   # No-op
-            1: Vector(0, 1),  # Up
-            2: Vector(1, 0),   # Right
-            3: Vector(0, -1),   # Down
-            4: Vector(-1, 0),  # Left
-            5: Vector(1, 1),  # Up-Right
-            6: Vector(1, -1),   # Down-Right
-            7: Vector(-1, 1), # Up-Left
-            8: Vector(-1, -1),  # Down-Left
-        }
+        self.action_space = Discrete(len(MOVEMENT_VECTORS))
+        self._action_map = {index: movement_vector for index, movement_vector in enumerate(MOVEMENT_VECTORS)}
         self.observation_space = calculate_observation_space(config.agent.visibility_radius, config.agent.observation_stack_depth)
 
         # Compute metrics
@@ -252,7 +243,7 @@ class ReactiveAvoidanceEnv(MiniGridEnv):
                                                                      movement_vector = self._action_map[action],
                                                                      grid_dimensions = self.config.environment.grid_dimensions,
                                                                      obstacles_coordinates = self.config.environment.obstacles_coordinates,
-                                                                     seekers_coordinates = self._current_seeker_coordinates,
+                                                                     seekers_coordinates = frozenset(self._current_seeker_coordinates),
                                                                      goal_coordinates = self.config.agent.goal_coordinates)
         # Update the agent's position in the grid
         self.agent_pos = (self._current_agent_coordinates.x, self._current_agent_coordinates.y)
@@ -295,15 +286,15 @@ class ReactiveAvoidanceEnv(MiniGridEnv):
             self.grid.set(coordinates.x, coordinates.y, None)
         # Move the seekers in the environment
         for i, seeker in enumerate(self.config.seekers):
-            other_seekers_coordinates = self._current_seeker_coordinates[:i] + self._current_seeker_coordinates[i+1:]
+            other_seekers_coordinates = frozenset(self._current_seeker_coordinates[:i] + self._current_seeker_coordinates[i+1:])
             # TODO: Implement other policies
             self._current_seeker_coordinates[i] = move_seeker(current_coordinates = self._current_seeker_coordinates[i],
                                                               velocity = seeker.velocity,
-                                                              policy = "astar",
+                                                              policy = "a-star",
                                                               current_agent_coordinates = self._current_agent_coordinates,
                                                               grid_dimensions = self.config.environment.grid_dimensions,
                                                               obstacles_coordinates = self.config.environment.obstacles_coordinates,
-                                                              seekers_coordinates = other_seekers_coordinates,
+                                                              other_seekers_coordinates = other_seekers_coordinates,
                                                               goal_coordinates = self.config.agent.goal_coordinates)
         # Update the seekers' positions in the grid
         for coordinates in self._current_seeker_coordinates:
@@ -335,7 +326,7 @@ class ReactiveAvoidanceEnv(MiniGridEnv):
         else:
             # TODO: Implement coefficient for progress reward
             progress_reward = (previous_time_steps_to_goal - current_time_steps_to_goal) * 0.05
-        # Linear danger penalty within a Chebyshevradius of 3 cells
+        # Linear danger penalty within a Chebyshev radius of 3 cells
         danger_penalty = 0.0
         for seeker_coordinates in self._current_seeker_coordinates:
             distance_to_seeker = chebyshev_distance(self._current_agent_coordinates, seeker_coordinates)

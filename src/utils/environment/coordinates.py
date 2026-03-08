@@ -74,3 +74,25 @@ class Coordinates:
         :return: NotImplemented.
         """
         return NotImplemented
+
+    def __eq__(self, other: object) -> bool:
+        """
+        Implements the equality operator for Coordinates objects.
+        
+        :param other: The object to compare.
+        :return: True if the coordinates are equal, False otherwise.
+        """
+        if not isinstance(other, Coordinates):
+            return False
+        return self.x == other.x and self.y == other.y
+
+    def __lt__(self, other: object) -> bool:
+        """
+        Implements the less than operator for Coordinates objects.
+        
+        :param other: The object to compare.
+        :return: True if the coordinates are less than the other coordinates, False otherwise.
+        """
+        if not isinstance(other, Coordinates):
+            return False
+        return self.x < other.x or (self.x == other.x and self.y < other.y)
