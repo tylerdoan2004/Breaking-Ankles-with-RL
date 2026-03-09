@@ -176,7 +176,7 @@ def move_agent(*,
     :param obstacles_coordinates: The obstacles' coordinates.
     :param seekers_coordinates: The seekers' coordinates.
     :param goal_coordinates: The goal coordinates.
-    :return: A tuple containing the final coordinates of the agent, the last valid coordinates of the agent, whether the agent collided (out-of-bounds, obstacle, or seeker), and whether the agent reached the goal.
+    :return: A tuple containing the updated coordinates of the agent, the last valid coordinates of the agent, whether the agent collided (out-of-bounds, obstacle, or seeker), and whether the agent reached the goal.
     """
     # NOTE: This movement allows the agent to slip through diagonal obstacles
     last_valid_coordinates = current_coordinates
