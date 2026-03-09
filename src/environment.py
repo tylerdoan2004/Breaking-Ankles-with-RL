@@ -238,13 +238,13 @@ class ReactiveAvoidanceEnv(MiniGridEnv):
         previous_time_steps_to_goal = self._time_steps_to_goal_mapping.get(self._current_agent_coordinates)
 
         # Move the agent in the environment
-        self._current_agent_coordinates, collided, goal = move_agent(current_coordinates = self._current_agent_coordinates,
-                                                                     velocity = self.config.agent.velocity,
-                                                                     movement_vector = self._action_map[action],
-                                                                     grid_dimensions = self.config.environment.grid_dimensions,
-                                                                     obstacles_coordinates = self.config.environment.obstacles_coordinates,
-                                                                     seekers_coordinates = frozenset(self._current_seeker_coordinates),
-                                                                     goal_coordinates = self.config.agent.goal_coordinates)
+        self._current_agent_coordinates, last_valid_agent_coordinates, collided, goal = move_agent(current_coordinates = self._current_agent_coordinates,
+                                                                                                   velocity = self.config.agent.velocity,
+                                                                                                   movement_vector = self._action_map[action],
+                                                                                                   grid_dimensions = self.config.environment.grid_dimensions,
+                                                                                                   obstacles_coordinates = self.config.environment.obstacles_coordinates,
+                                                                                                   seekers_coordinates = frozenset(self._current_seeker_coordinates),
+                                                                                                   goal_coordinates = self.config.agent.goal_coordinates)
         # Update the agent's position in the grid
         self.agent_pos = (self._current_agent_coordinates.x, self._current_agent_coordinates.y)
 
@@ -264,10 +264,14 @@ class ReactiveAvoidanceEnv(MiniGridEnv):
                 collision_type = "boundary"
             elif self._current_agent_coordinates in self._current_seeker_coordinates:
                 collision_type = "seeker"
+            # After determining the collision type, reset the agent's coordinates to the last valid coordinates
+            self._current_agent_coordinates = last_valid_agent_coordinates
+            # Reset the agent's position in the grid to the last valid coordinates
+            self.agent_pos = (last_valid_agent_coordinates.x, last_valid_agent_coordinates.y)
             return self._finalize_step(reward = -5, terminated = True, truncated = truncated,
                                        outcome = "collision",
                                        starting_time_steps_to_goal = self._time_steps_to_goal_mapping.get(self.config.agent.start_coordinates),
-                                       ending_time_steps_to_goal = self._time_steps_to_goal_mapping.get(self._current_agent_coordinates),
+                                       ending_time_steps_to_goal = self._time_steps_to_goal_mapping.get(last_valid_agent_coordinates),
                                        episode_length = self._current_step,
                                        minimum_distance_to_hazards = self._minimum_distance_to_hazards,
                                        collision_type = collision_type)

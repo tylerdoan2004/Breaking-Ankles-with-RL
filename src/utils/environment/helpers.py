@@ -165,7 +165,7 @@ def move_agent(*,
                grid_dimensions: GridDimensions,
                obstacles_coordinates: AbstractSet[Coordinates],
                seekers_coordinates: AbstractSet[Coordinates],
-               goal_coordinates: Coordinates) -> tuple[Coordinates, bool, bool]:
+               goal_coordinates: Coordinates) -> tuple[Coordinates, Coordinates, bool, bool]:
     """
     Moves the agent in the environment based on its current coordinates, velocity, and action.
     
@@ -176,9 +176,10 @@ def move_agent(*,
     :param obstacles_coordinates: The obstacles' coordinates.
     :param seekers_coordinates: The seekers' coordinates.
     :param goal_coordinates: The goal coordinates.
-    :return: A tuple containing the final coordinates of the agent, whether the agent collided (out-of-bounds, obstacle, or seeker), and whether the agent reached the goal.
+    :return: A tuple containing the final coordinates of the agent, the last valid coordinates of the agent, whether the agent collided (out-of-bounds, obstacle, or seeker), and whether the agent reached the goal.
     """
     # NOTE: This movement allows the agent to slip through diagonal obstacles
+    last_valid_coordinates = current_coordinates
     intermediate_coordinates = current_coordinates
     for _ in range(velocity):
         intermediate_coordinates += movement_vector
@@ -187,10 +188,11 @@ def move_agent(*,
                                 obstacles_coordinates = obstacles_coordinates,
                                 seekers_coordinates = seekers_coordinates,
                                 goal_coordinates = goal_coordinates):
-            return intermediate_coordinates, True, False
+            return intermediate_coordinates, last_valid_coordinates, True, False
+        last_valid_coordinates = intermediate_coordinates
         if intermediate_coordinates == goal_coordinates:
-            return intermediate_coordinates, False, True
-    return intermediate_coordinates, False, False
+            return intermediate_coordinates, last_valid_coordinates, False, True
+    return intermediate_coordinates, last_valid_coordinates, False, False
 
 
 def calculate_entity_legal_neighboring_coordinates(*,
@@ -473,12 +475,14 @@ def compute_time_steps_to_goal_mapping(*, goal_coordinates: Coordinates, grid_di
     if goal_coordinates not in predecessors:
         return {}
     for current_coordinates in valid_coordinates:
-        for movement_vector in (Vector(0, 1), Vector(1, 0), Vector(0, -1), Vector(-1, 0), Vector(1, 1), Vector(1, -1), Vector(-1, 1), Vector(-1, -1)):
-            next_coordinates, collided, _ = move_agent(current_coordinates = current_coordinates, velocity = agent_velocity, movement_vector = movement_vector,
-                                                       grid_dimensions = grid_dimensions,
-                                                       obstacles_coordinates = obstacles_coordinates,
-                                                       seekers_coordinates = frozenset(),
-                                                       goal_coordinates = goal_coordinates)
+        for movement_vector in MOVEMENT_VECTORS:
+            if movement_vector == Vector(0, 0):
+                continue
+            next_coordinates, _, collided, _ = move_agent(current_coordinates = current_coordinates, velocity = agent_velocity, movement_vector = movement_vector,
+                                                          grid_dimensions = grid_dimensions,
+                                                          obstacles_coordinates = obstacles_coordinates,
+                                                          seekers_coordinates = frozenset(),
+                                                          goal_coordinates = goal_coordinates)
             if collided:
                 continue
             if next_coordinates in predecessors:
