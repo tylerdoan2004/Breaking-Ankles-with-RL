@@ -67,7 +67,7 @@ class VideoCallback(BaseCallback):
             try:
                 record_video_single_episode(
                     video_directory = str(self.video_directory),
-                    video_name_prefix = f"{self.video_name_prefix}-timestep-{self.next_recording_timestep}",
+                    video_name_prefix = f"{self.video_name_prefix}-{self.next_recording_timestep}-steps",
                     environment_factory = self.environment_factory,
                     agent = StableBaselines3Agent(self.model),
                     seed = self.seed

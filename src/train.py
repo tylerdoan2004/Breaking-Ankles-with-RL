@@ -92,7 +92,7 @@ def main():
     checkpoint_callback = CheckpointCallback(
         save_freq = max(1, (experiment_metadata.training.total_timesteps // experiment_metadata.logging.num_checkpoints) // experiment_metadata.training.n_envs),
         save_path = str(experiment_directory / "models/checkpoints"),
-        name_prefix = f"{experiment_metadata.experiment_name}_{experiment_metadata.model.name}",
+        name_prefix = "training",
         verbose = experiment_metadata.logging.verbose
     )
     # Periodically evaluate the agent on the validation environment; save the best model

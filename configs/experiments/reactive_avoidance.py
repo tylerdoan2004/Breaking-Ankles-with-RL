@@ -58,6 +58,7 @@ SYSTEM_CONFIGURATIONS = SystemConfigurationsMetadata(
 )
 TRAINING_METADATA = TrainingMetadata(
     n_envs = 8,
+    # NOTE: To guarantee expected logging behavior, set total timesteps to a multiple of MODEL.hyperparameters.n_steps * n_envs
     total_timesteps = 2_000_000
 )
 LOGGING_METADATA = LoggingMetadata(
