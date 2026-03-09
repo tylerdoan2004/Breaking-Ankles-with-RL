@@ -7,7 +7,9 @@ from configs.experiments.reactive_avoidance import (
 )
 from src.utils.environment.environment_creation import make_vectorized_environment, make_video_recordable_environment_factory, validate_environment
 from src.utils.evaluation.helpers import evaluate_agent
-from src.utils.logging.helpers import initialize_logging_directories, get_runtime_metadata, record_video_single_episode
+from src.utils.logging.helpers import (
+    INFO_KEYWORDS, initialize_logging_directories, get_runtime_metadata, record_video_single_episode
+)
 from src.utils.logging.experiment_metadata import ExperimentMetadata
 from src.utils.training.callbacks import RollingMetricsCallback, VideoCallback
 from src.utils.typing.agent import StableBaselines3Agent
@@ -56,10 +58,7 @@ def main():
     environment = VecMonitor(
         environment,
         filename = str(experiment_directory / "training/metrics/monitor.csv"),
-        info_keywords = ("outcome",
-                         "net_progress",
-                         "path_efficiency",
-                         "minimum_distance_to_obstacle", "minimum_distance_to_boundary", "minimum_distance_to_seeker", "collision_type")
+        info_keywords = INFO_KEYWORDS,
     )
     print("Vectorized training environment created.")
     
@@ -104,10 +103,7 @@ def main():
     validation_environment = VecMonitor(
         validation_environment,
         filename = None,
-        info_keywords = ("outcome",
-                         "net_progress",
-                         "path_efficiency",
-                         "minimum_distance_to_obstacle", "minimum_distance_to_boundary", "minimum_distance_to_seeker", "collision_type")
+        info_keywords = INFO_KEYWORDS
     )
     eval_callback = EvalCallback(
         eval_env = validation_environment,
@@ -190,7 +186,8 @@ def main():
         environment_name = "In Distribution",
         seed = experiment_metadata.seed,
         n_episodes = experiment_metadata.logging.episodes_per_evaluation,
-        metrics_directory = experiment_directory / "evaluation/in_distribution/metrics"
+        metrics_directory = experiment_directory / "evaluation/in_distribution/metrics",
+        info_keywords = INFO_KEYWORDS
     )
     print()
     print("Evaluation complete.")
@@ -213,7 +210,8 @@ def main():
         environment_name = "Out of Distribution",
         seed = experiment_metadata.seed,
         n_episodes = experiment_metadata.logging.episodes_per_evaluation,
-        metrics_directory = experiment_directory / "evaluation/out_of_distribution/metrics"
+        metrics_directory = experiment_directory / "evaluation/out_of_distribution/metrics",
+        info_keywords = INFO_KEYWORDS
     )
     print()
     print("Evaluation complete.")

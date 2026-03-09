@@ -16,6 +16,17 @@ from src.utils.typing.agent import ActType, Agent, ObsType
 from src.utils.typing.environment import VideoRecordableEnvironmentFactory
 
 
+INFO_KEYWORDS: tuple[str, ...] = (
+    "outcome",
+    "net_progress",
+    "path_efficiency",
+    "minimum_distance_to_obstacle",
+    "minimum_distance_to_boundary",
+    "minimum_distance_to_seeker",
+    "collision_type"
+)
+
+
 def get_package_metadata(package_name: str) -> PackageMetadata:
     """
     Returns metadata about a package.
