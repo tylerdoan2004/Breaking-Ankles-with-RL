@@ -102,14 +102,13 @@ def main():
     )
     validation_environment = VecMonitor(
         validation_environment,
-        filename = None,
+        filename = str(experiment_directory / "validation/metrics/monitor.csv"),
         info_keywords = INFO_KEYWORDS
     )
     eval_callback = EvalCallback(
         eval_env = validation_environment,
         n_eval_episodes = experiment_metadata.logging.episodes_per_validation_evaluation,
         eval_freq = max(1, (experiment_metadata.training.total_timesteps // experiment_metadata.logging.num_validation_evaluations) // experiment_metadata.training.n_envs),
-        log_path = str(experiment_directory / "validation/metrics"),
         best_model_save_path = str(experiment_directory / "models"),
         verbose = experiment_metadata.logging.verbose
     )
