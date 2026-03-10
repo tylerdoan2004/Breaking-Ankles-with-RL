@@ -26,7 +26,8 @@ INFO_KEYWORDS: tuple[str, ...] = (
     "minimum_distance_to_obstacle",
     "minimum_distance_to_boundary",
     "minimum_distance_to_seeker",
-    "collision_type"
+    "collision_type",
+    "interceptor_policy"
 )
 
 
@@ -227,7 +228,8 @@ def compute_episode_metrics(*,
                             ending_time_steps_to_goal: Optional[int],
                             episode_length: int,
                             minimum_distance_to_hazards: dict[Literal["obstacle", "boundary", "seeker"], int | float],
-                            collision_type: Optional[Literal["obstacle", "boundary", "seeker"]]) -> dict[str, Optional[Union[int, float, str]]]:
+                            collision_type: Optional[Literal["obstacle", "boundary", "seeker"]],
+                            interceptor_policy: Optional[Literal["random", "greedy", "a-star"]]) -> dict[str, Optional[Union[int, float, str]]]:
     """
     Computes the metrics for an episode.
     
@@ -237,6 +239,7 @@ def compute_episode_metrics(*,
     :param episode_length: The length of the episode.
     :param minimum_distance_to_hazards: A dictionary mapping the type of hazard to the agent's minimum distance to the hazard.
     :param collision_type: The type of collision that occurred during the episode.
+    :param interceptor_policy: The policy of the interceptor.
     :return: A dictionary of episode metrics.
     """
     episode_metrics: dict[str, Optional[Union[int, float, str]]] = {}
@@ -247,4 +250,5 @@ def compute_episode_metrics(*,
     episode_metrics["minimum_distance_to_boundary"] = minimum_distance_to_hazards.get("boundary")
     episode_metrics["minimum_distance_to_seeker"] = minimum_distance_to_hazards.get("seeker")
     episode_metrics["collision_type"] = collision_type
+    episode_metrics["interceptor_policy"] = interceptor_policy
     return episode_metrics

@@ -206,7 +206,8 @@ class ReactiveAvoidanceEnv(MiniGridEnv):
                        ending_time_steps_to_goal: Optional[int],
                        episode_length: int,
                        minimum_distance_to_hazards: dict[Literal["obstacle", "boundary", "seeker"], int | float],
-                       collision_type: Optional[Literal["obstacle", "boundary", "seeker"]]) -> tuple[np.ndarray, float, bool, bool, dict[str, Any]]:
+                       collision_type: Optional[Literal["obstacle", "boundary", "seeker"]],
+                       interceptor_policy: Optional[Literal["random", "greedy", "a-star"]]) -> tuple[np.ndarray, float, bool, bool, dict[str, Any]]:
         """
         Finalizes the step in the environment. Computes and appends the agent's local observation to the local observation history. Computes the episode metrics.
         Returns a tuple containing the observation, reward, termination flag, truncation flag, and auxiliary info dictionary.
@@ -220,6 +221,7 @@ class ReactiveAvoidanceEnv(MiniGridEnv):
         :param episode_length: The length of the episode.
         :param minimum_distance_to_hazards: A dictionary mapping the type of hazard to the agent's minimum distance to the hazard.
         :param collision_type: The type of collision that occurred during the episode.
+        :param interceptor_policy: The policy of the interceptor.
         :return: A tuple containing the observation, reward, termination flag, truncation flag, and auxiliary info dictionary.
         """
         self._current_local_observation_history.append(self._compute_local_observation())
@@ -228,7 +230,8 @@ class ReactiveAvoidanceEnv(MiniGridEnv):
                                                   ending_time_steps_to_goal = ending_time_steps_to_goal,
                                                   episode_length = episode_length,
                                                   minimum_distance_to_hazards = minimum_distance_to_hazards,
-                                                  collision_type = collision_type)
+                                                  collision_type = collision_type,
+                                                  interceptor_policy = interceptor_policy)
         return self._get_obs(), reward, terminated, truncated, self._get_info(episode_metrics = episode_metrics)
 
     def step(self, action: object) -> tuple[np.ndarray, float, bool, bool, dict[str, Any]]:
@@ -312,7 +315,8 @@ class ReactiveAvoidanceEnv(MiniGridEnv):
                                        ending_time_steps_to_goal = current_time_steps_to_goal,
                                        episode_length = self._current_step,
                                        minimum_distance_to_hazards = self._minimum_distance_to_hazards,
-                                       collision_type = collision_type)
+                                       collision_type = collision_type,
+                                       interceptor_policy = None)
 
         # If moving the agent does not result in a collision, update the agent's coordinates
         self._current_agent_coordinates = updated_agent_coordinates
@@ -349,7 +353,8 @@ class ReactiveAvoidanceEnv(MiniGridEnv):
                                        ending_time_steps_to_goal = current_time_steps_to_goal,
                                        episode_length = self._current_step,
                                        minimum_distance_to_hazards = self._minimum_distance_to_hazards,
-                                       collision_type = None)
+                                       collision_type = None,
+                                       interceptor_policy = None)
 
         # Clear the seekers' positions in the grid
         for coordinates in self._current_seekers_coordinates:
@@ -394,6 +399,8 @@ class ReactiveAvoidanceEnv(MiniGridEnv):
 
         # If moving the seekers results in an interception, return the current observation and terminate the episode
         if self._current_agent_coordinates in self._current_seekers_coordinates:
+            # Get the interceptor's policy
+            interceptor_policy = self.config.seekers[self._current_seekers_coordinates.index(self._current_agent_coordinates)].policy
             return self._finalize_step(reward = compute_rewards(goal = goal,
                                                                 collided = collided,
                                                                 intercepted = True,
@@ -412,7 +419,8 @@ class ReactiveAvoidanceEnv(MiniGridEnv):
                                        ending_time_steps_to_goal = current_time_steps_to_goal,
                                        episode_length = self._current_step,
                                        minimum_distance_to_hazards = self._minimum_distance_to_hazards,
-                                       collision_type = None)
+                                       collision_type = None,
+                                       interceptor_policy = interceptor_policy)
 
         # Otherwise, continue the episode
         return self._finalize_step(reward = compute_rewards(goal = goal,
@@ -433,7 +441,8 @@ class ReactiveAvoidanceEnv(MiniGridEnv):
                                    ending_time_steps_to_goal = current_time_steps_to_goal,
                                    episode_length = self._current_step,
                                    minimum_distance_to_hazards = self._minimum_distance_to_hazards,
-                                   collision_type = None)
+                                   collision_type = None,
+                                   interceptor_policy = None)
 
     def get_full_render(self, highlight: bool = True, tile_size: Optional[int] = None) -> np.ndarray:
         """

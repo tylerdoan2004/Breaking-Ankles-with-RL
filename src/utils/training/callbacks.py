@@ -97,6 +97,9 @@ class RollingMetricsCallback(BaseCallback):
                  collision_types: tuple[str, ...] = ("obstacle",
                                                      "boundary",
                                                      "seeker"),
+                 interceptor_policies: tuple[str, ...] = ("random",
+                                                          "greedy",
+                                                          "a-star"),
                  verbose: int = 0) -> None:
         """
         Initializes the RollingMetricsCallback object.
@@ -105,6 +108,7 @@ class RollingMetricsCallback(BaseCallback):
         :param outcomes: Possible episode outcomes stored in the info dictionary.
         :param numeric_info_keywords: Info dictionary keywords corresponding to numeric episode-level metrics.
         :param collision_types: Possible collision types stored in the info dictionary.
+        :param interceptor_policies: Possible interceptor policies stored in the info dictionary.
         :param verbose: The verbosity level.
         :return: None.
         """
@@ -113,10 +117,12 @@ class RollingMetricsCallback(BaseCallback):
         self.outcomes = outcomes
         self.numeric_info_keywords = numeric_info_keywords
         self.collision_types = collision_types
+        self.interceptor_policies = interceptor_policies
 
         self.rolling_outcomes = deque(maxlen = rolling_window_size)
         self.rolling_numeric_metrics = {key: deque(maxlen = rolling_window_size) for key in numeric_info_keywords}
         self.rolling_collision_types = deque(maxlen = rolling_window_size)
+        self.rolling_interceptor_policies = deque(maxlen = rolling_window_size)
 
     def _on_step(self) -> bool:
         """
@@ -157,12 +163,16 @@ class RollingMetricsCallback(BaseCallback):
                 if not isinstance(value, (int, float)):
                     continue
                 self.rolling_numeric_metrics[info_keyword].append(float(value))
-                # Log the mean of each episodic-level metric over the finished episodes
+                # Log the mean of each numeric episodic-level metric over the finished episodes
                 self.logger.record_mean(f"episode/{info_keyword}", float(value))
 
             collision_type = info.get("collision_type")
             if collision_type is not None:
                 self.rolling_collision_types.append(collision_type)
+
+            interceptor_policy = info.get("interceptor_policy")
+            if interceptor_policy is not None:
+                self.rolling_interceptor_policies.append(interceptor_policy)
 
         # Compute rolling outcome rates
         if self.rolling_outcomes:
@@ -182,5 +192,12 @@ class RollingMetricsCallback(BaseCallback):
             total = len(self.rolling_collision_types)
             for collision_type in self.collision_types:
                 self.logger.record(f"collision_type/{collision_type}_rate", counts.get(collision_type, 0) / total)
+
+        # Compute rolling interceptor policy rates
+        if self.rolling_interceptor_policies:
+            counts = Counter(self.rolling_interceptor_policies)
+            total = len(self.rolling_interceptor_policies)
+            for interceptor_policy in self.interceptor_policies:
+                self.logger.record(f"interceptor_policy/{interceptor_policy}_rate", counts.get(interceptor_policy, 0) / total)
 
         return True
