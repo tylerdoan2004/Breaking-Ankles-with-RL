@@ -5,7 +5,7 @@ import sys
 import numpy as np
 import torch
 from pathlib import Path
-from typing import cast, Iterable, Literal, Optional, Union
+from typing import cast, Callable, Iterable, Literal, Optional, Union
 from gymnasium import Env
 from gymnasium.wrappers import RecordVideo
 from src.utils.environment.coordinates import Coordinates
@@ -156,7 +156,8 @@ def compute_distance_to_hazards(*,
                                 current_agent_coordinates: Coordinates,
                                 obstacles_coordinates: Iterable[Coordinates],
                                 grid_dimensions: GridDimensions,
-                                seekers_coordinates: Iterable[Coordinates]) -> dict[Literal["obstacle", "boundary", "seeker"], int]:
+                                seekers_coordinates: Iterable[Coordinates],
+                                distance_metric: Callable[[Coordinates, Coordinates], int | float] = chebyshev_distance) -> dict[Literal["obstacle", "boundary", "seeker"], int | float]:
     """
     Computes the agent's distance to each type of hazard.
     
@@ -167,11 +168,26 @@ def compute_distance_to_hazards(*,
     :return: A dictionary containing the agent's distance to each type of hazard.
     """
     return {
-        "obstacle": min(chebyshev_distance(current_agent_coordinates, obstacle_coordinates) for obstacle_coordinates in obstacles_coordinates),
+        "obstacle": min(distance_metric(current_agent_coordinates, obstacle_coordinates) for obstacle_coordinates in obstacles_coordinates),
         "boundary": min(current_agent_coordinates.x + 1, grid_dimensions.width - current_agent_coordinates.x, current_agent_coordinates.y + 1, grid_dimensions.height - current_agent_coordinates.y),
-        "seeker": min(chebyshev_distance(current_agent_coordinates, seeker_coordinates) for seeker_coordinates in seekers_coordinates),
+        "seeker": min(distance_metric(current_agent_coordinates, seeker_coordinates) for seeker_coordinates in seekers_coordinates),
     }
 
+
+def compute_minimum_distance_to_hazards(*,
+                                        current_minimum_distance_to_hazards: dict[Literal["obstacle", "boundary", "seeker"], int | float],
+                                        current_distance_to_hazards: dict[Literal["obstacle", "boundary", "seeker"], int | float]) -> dict[Literal["obstacle", "boundary", "seeker"], int | float]:
+    """
+    Computes the agent's minimum distance to each type of hazard.
+    
+    :param current_minimum_distance_to_hazards: The current minimum distance to each type of hazard.
+    :param current_distance_to_hazards: The current distance to each type of hazard.
+    :return: A dictionary containing the agent's minimum distance to each type of hazard.
+    """
+    return {
+        key: min(current_minimum_distance_to_hazards[key], value)
+        for key, value in current_distance_to_hazards.items()
+    }
 
 
 def compute_net_progress(starting_time_steps_to_goal: Optional[int], ending_time_steps_to_goal: Optional[int]) -> Optional[int]:
@@ -207,7 +223,7 @@ def compute_episode_metrics(*,
                             starting_time_steps_to_goal: Optional[int],
                             ending_time_steps_to_goal: Optional[int],
                             episode_length: int,
-                            minimum_distance_to_hazards: dict[Literal["obstacle", "boundary", "seeker"], int],
+                            minimum_distance_to_hazards: dict[Literal["obstacle", "boundary", "seeker"], int | float],
                             collision_type: Optional[str]) -> dict[str, Optional[Union[int, float, str]]]:
     """
     Computes the metrics for an episode.
@@ -216,7 +232,7 @@ def compute_episode_metrics(*,
     :param starting_time_steps_to_goal: The minimum number of time steps to the goal at the start of the episode.
     :param ending_time_steps_to_goal: The minimum number of time steps to the goal at the end of the episode.
     :param episode_length: The length of the episode.
-    :param minimum_distance_to_hazards: A dictionary mapping the type of hazard to the agent's minimum Chebyshev distance to the hazard.
+    :param minimum_distance_to_hazards: A dictionary mapping the type of hazard to the agent's minimum distance to the hazard.
     :param collision_type: The type of collision that occurred during the episode.
     :return: A dictionary of episode metrics.
     """

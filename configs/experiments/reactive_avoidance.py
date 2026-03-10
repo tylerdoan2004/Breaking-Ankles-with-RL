@@ -29,7 +29,8 @@ MODEL = ModelMetadata(
         "clip_range": 0.2,
         "clip_range_vf": None,
         "normalize_advantage": True,
-        "ent_coef": 0.0,
+        # NOTE: Adjusted from 0.0 to 0.005 to prevent premature convergence
+        "ent_coef": 0.005,
         "vf_coef": 0.5,
         "max_grad_norm": 0.5,
         "use_sde": False,
@@ -59,7 +60,7 @@ SYSTEM_CONFIGURATIONS = SystemConfigurationsMetadata(
 TRAINING_METADATA = TrainingMetadata(
     n_envs = 8,
     # NOTE: To guarantee expected logging behavior, set total timesteps to a multiple of MODEL.hyperparameters.n_steps * n_envs
-    total_timesteps = 2_000_000
+    total_timesteps = 1_015_808
 )
 LOGGING_METADATA = LoggingMetadata(
     logging_directories = LoggingDirectoriesMetadata(
@@ -68,9 +69,9 @@ LOGGING_METADATA = LoggingMetadata(
     ),
     verbose = 0,
     rolling_window_size = 200,
-    num_checkpoints = 25,
-    num_validation_evaluations = 25,
+    num_checkpoints = 16,
+    num_validation_evaluations = 16,
     episodes_per_validation_evaluation = 25,
-    episodes_per_evaluation = 200,
-    num_videos = 10
+    episodes_per_evaluation = 25,
+    num_videos = 16
 )

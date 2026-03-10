@@ -263,11 +263,11 @@ def calculate_entity_legal_moves(*,
 
 def chebyshev_distance(first_coordinates: Coordinates, second_coordinates: Coordinates) -> int:
     """
-    Computes the Chebychev distance between two coordinates.
+    Computes the Chebyshev distance between two coordinates.
     
     :param first_coordinates: The first pair of coordinates.
     :param second_coordinates: The second pair of coordinates.
-    :return: The Chebychev distance between the two coordinates.
+    :return: The Chebyshev distance between the two coordinates.
     """
     return max(abs(first_coordinates.x - second_coordinates.x), abs(first_coordinates.y - second_coordinates.y))
 
@@ -276,12 +276,12 @@ def greedy_seeker_policy(legal_moves: Iterable[Vector], *,
                          current_coordinates: Coordinates,
                          current_agent_coordinates: Coordinates) -> Vector:
     """
-    Computes the legal move that minimizes the Chebychev distance to the agent. Breaks ties uniformly at random.
+    Computes the legal move that minimizes the Chebyshev distance to the agent. Breaks ties uniformly at random.
     
     :param legal_moves: The legal moves for a seeker.
     :param current_coordinates: The current coordinates of the seeker.
     :param current_agent_coordinates: The current coordinates of the agent.
-    :return: A legal move that minimizes the Chebychev distance to the agent.
+    :return: A legal move that minimizes the Chebyshev distance to the agent.
     """
     legal_moves = list(legal_moves)
     minimum_distance = min(chebyshev_distance(current_coordinates + movement_vector, current_agent_coordinates)
@@ -309,7 +309,7 @@ def a_star_seeker_policy(legal_moves: Iterable[Vector], *,
     :param obstacles_coordinates: The obstacles' coordinates.
     :param other_seekers_coordinates: The coordinates of other seekers.
     :param goal_coordinates: The goal coordinates.
-    :param heuristic: The heuristic function for A* pathfinding. Defaults to the Chebychev distance. The heuristic function should be admissible.
+    :param heuristic: The heuristic function for A* pathfinding. Defaults to the Chebyshev distance. The heuristic function should be admissible.
     :return: A legal move that begins the shortest path from the seeker's current coordinates to the agent's current coordinates using A* pathfinding.
     """
     if current_coordinates == current_agent_coordinates:
@@ -500,3 +500,112 @@ def compute_time_steps_to_goal_mapping(*, goal_coordinates: Coordinates, grid_di
             time_steps_to_goal[predecessor_coordinates] = current_time_steps_to_goal + 1
             queue.append(predecessor_coordinates)
     return time_steps_to_goal
+
+
+def compute_terminal_rewards(*,
+                             goal: bool,
+                             collided: bool,
+                             intercepted: bool,
+                             truncated: bool) -> float:
+    """
+    Computes the reward term associated with terminal environment states.
+    
+    :param goal: Whether the agent reached the goal.
+    :param collided: Whether the agent collided with an obstacle, a seeker, or an out-of-bounds cell.
+    :param intercepted: Whether the agent was intercepted by a seeker.
+    :param truncated: Whether the episode was truncated.
+    :return: The reward term associated with terminal environment states.
+    """
+    if goal:
+        return 5.0
+    if collided or intercepted or truncated:
+        return -5.0
+    return 0.0
+
+
+def compute_progress_rewards(*,
+                             previous_time_steps_to_goal: Optional[int] = None,
+                             current_time_steps_to_goal: Optional[int] = None,
+                             progress_coefficient: float = 0.05) -> float:
+    """
+    Computes the reward term associated with agent progress in the environment.
+    
+    :param previous_time_steps_to_goal: The previous minimum number of time steps to reach the goal.
+    :param current_time_steps_to_goal: The current minimum number of time steps to reach the goal.
+    :param progress_coefficient: The coefficient for the progress reward term.
+    :return: The reward term associated with agent progress in the environment.
+    """
+    if previous_time_steps_to_goal is None or current_time_steps_to_goal is None:
+        return 0.0
+    return progress_coefficient * (previous_time_steps_to_goal - current_time_steps_to_goal)
+
+
+def compute_danger_penalty(*,
+                           current_agent_coordinates: Coordinates,
+                           current_seekers_coordinates: Iterable[Coordinates],
+                           visibility_radius: int,
+                           distance_metric: Callable[[Coordinates, Coordinates], int | float] = chebyshev_distance,
+                           danger_coefficient: float = 0.01) -> float:
+    """
+    Computes the reward term associated with the agent's danger level in the environment.
+
+    :param current_agent_coordinates: The current coordinates of the agent.
+    :param current_seekers_coordinates: The current coordinates of the seekers.
+    :param visibility_radius: The visibility radius of the agent.
+    :param distance_metric: The distance metric to use for computing the distance between the agent and a seeker.
+    :param danger_coefficient: The coefficient for the danger reward term.
+    :return: The reward term associated with the agent's danger level in the environment.
+    """
+    danger_penalty = 0.0
+    for seeker_coordinates in current_seekers_coordinates:
+        distance_to_seeker = distance_metric(current_agent_coordinates, seeker_coordinates)
+        if distance_to_seeker < visibility_radius:
+            danger_penalty -= danger_coefficient * (1 - distance_to_seeker / visibility_radius)
+    return danger_penalty
+
+
+def compute_rewards(*, 
+                    goal: bool,
+                    collided: bool,
+                    intercepted: bool,
+                    truncated: bool,
+                    current_agent_coordinates: Coordinates,
+                    current_seekers_coordinates: Iterable[Coordinates],
+                    visibility_radius: int,
+                    distance_metric: Callable[[Coordinates, Coordinates], int | float] = chebyshev_distance,
+                    danger_coefficient: float = 0.01,
+                    previous_time_steps_to_goal: Optional[int] = None,
+                    current_time_steps_to_goal: Optional[int] = None,
+                    progress_coefficient: float = 0.05,
+                    step_penalty: float = 0.01) -> float:
+    """
+    Computes the agent's reward for performing an action in the environment.
+    
+    :param goal: Whether the agent reached the goal.
+    :param collided: Whether the agent collided with an obstacle, a seeker, or an out-of-bounds cell.
+    :param intercepted: Whether the agent was intercepted by a seeker.
+    :param truncated: Whether the episode was truncated.
+    :param current_agent_coordinates: The current coordinates of the agent.
+    :param current_seekers_coordinates: The current coordinates of the seekers.
+    :param visibility_radius: The visibility radius of the agent.
+    :param distance_metric: The distance metric to use for computing the distance between the agent and a seeker.
+    :param danger_coefficient: The coefficient for the danger reward term.
+    :param previous_time_steps_to_goal: The previous minimum number of time steps to reach the goal.
+    :param current_time_steps_to_goal: The current minimum number of time steps to reach the goal.
+    :param progress_coefficient: The coefficient for the progress reward term.
+    :param step_penalty: The penalty for each time step.
+    :return: The agent's reward for performing an action in the environment.
+    """
+    terminal_rewards = compute_terminal_rewards(goal = goal,
+                                                collided = collided,
+                                                intercepted = intercepted,
+                                                truncated = truncated)
+    danger_penalty = compute_danger_penalty(current_agent_coordinates = current_agent_coordinates,
+                                            current_seekers_coordinates = current_seekers_coordinates,
+                                            visibility_radius = visibility_radius,
+                                            distance_metric = distance_metric,
+                                            danger_coefficient = danger_coefficient)
+    progress_rewards = compute_progress_rewards(previous_time_steps_to_goal = previous_time_steps_to_goal,
+                                                current_time_steps_to_goal = current_time_steps_to_goal,
+                                                progress_coefficient = progress_coefficient)
+    return terminal_rewards + danger_penalty + progress_rewards - step_penalty

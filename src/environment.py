@@ -13,8 +13,8 @@ from src.utils.environment.coordinates import Coordinates
 from src.utils.environment.helpers import (
     calculate_observation_space,
     can_see,
-    chebyshev_distance,
     compute_offset_to_line_mapping,
+    compute_rewards,
     compute_time_steps_to_goal_mapping,
     scale_absolute_coordinates,
     scale_relative_vector,
@@ -24,7 +24,11 @@ from src.utils.environment.helpers import (
 )
 from src.utils.environment.seeker import Seeker
 from src.utils.environment.vector import Vector
-from src.utils.logging.helpers import compute_episode_metrics, compute_distance_to_hazards
+from src.utils.logging.helpers import (
+    compute_distance_to_hazards,
+    compute_episode_metrics,
+    compute_minimum_distance_to_hazards
+)
 from src.utils.yaml_parser.configuration import SystemConfiguration
 
 
@@ -57,11 +61,12 @@ class ReactiveAvoidanceEnv(MiniGridEnv):
             obstacles_coordinates = config.environment.obstacles_coordinates,
             agent_velocity = config.agent.velocity
         )
+        self._starting_time_steps_to_goal = self._time_steps_to_goal_mapping.get(config.agent.start_coordinates)
 
         # Initialize the internal dynamic components of the environment state
         self._current_step = 0
         self._current_agent_coordinates = config.agent.start_coordinates
-        self._current_seeker_coordinates = [seeker.start_coordinates for seeker in config.seekers]
+        self._current_seekers_coordinates = [seeker.start_coordinates for seeker in config.seekers]
         current_local_observation = self._compute_local_observation()
         self._current_local_observation_history: deque[np.ndarray] = deque(maxlen = config.agent.observation_stack_depth)
         for _ in range(config.agent.observation_stack_depth):
@@ -73,11 +78,11 @@ class ReactiveAvoidanceEnv(MiniGridEnv):
         self.observation_space = calculate_observation_space(config.agent.visibility_radius, config.agent.observation_stack_depth)
 
         # Compute metrics
-        self._minimum_distance_to_hazards = compute_distance_to_hazards(
+        self._minimum_distance_to_hazards: dict[Literal["obstacle", "boundary", "seeker"], int | float] = compute_distance_to_hazards(
             current_agent_coordinates = config.agent.start_coordinates,
             obstacles_coordinates = config.environment.obstacles_coordinates,
             grid_dimensions = config.environment.grid_dimensions,
-            seekers_coordinates = self._current_seeker_coordinates
+            seekers_coordinates = self._current_seekers_coordinates
         )
 
     def _compute_local_observation(self) -> np.ndarray:
@@ -89,7 +94,7 @@ class ReactiveAvoidanceEnv(MiniGridEnv):
         visibility_radius = self.config.agent.visibility_radius
         visibility_diameter = 2 * visibility_radius + 1
 
-        seeker_coordinates = set(self._current_seeker_coordinates)
+        seekers_coordinates = set(self._current_seekers_coordinates)
 
         local_observation = np.zeros((4, visibility_diameter, visibility_diameter), dtype = np.float32)
         for dx in range(-visibility_radius, visibility_radius + 1):
@@ -106,7 +111,7 @@ class ReactiveAvoidanceEnv(MiniGridEnv):
                     continue
                 if current_cell_coordinates in self.config.environment.obstacles_coordinates:
                     local_observation[2, dx + visibility_radius, dy + visibility_radius] = 1.0
-                if current_cell_coordinates in seeker_coordinates:
+                if current_cell_coordinates in seekers_coordinates:
                     local_observation[3, dx + visibility_radius, dy + visibility_radius] = 1.0
         return local_observation.reshape(-1)
 
@@ -133,7 +138,7 @@ class ReactiveAvoidanceEnv(MiniGridEnv):
         environment_state = {
             "current_step": self._current_step,
             "current_agent_coordinates": self._current_agent_coordinates,
-            "current_seeker_coordinates": self._current_seeker_coordinates,
+            "current_seekers_coordinates": self._current_seekers_coordinates,
             "current_local_observation_history": self._current_local_observation_history,
         }
         if episode_metrics is None:
@@ -151,7 +156,7 @@ class ReactiveAvoidanceEnv(MiniGridEnv):
         super().reset(seed = seed, options = options)
         self._current_step = 0
         self._current_agent_coordinates = self.config.agent.start_coordinates
-        self._current_seeker_coordinates = [seeker.start_coordinates for seeker in self.config.seekers]
+        self._current_seekers_coordinates = [seeker.start_coordinates for seeker in self.config.seekers]
         current_local_observation = self._compute_local_observation()
         self._current_local_observation_history = deque(maxlen = self.config.agent.observation_stack_depth)
         for _ in range(self.config.agent.observation_stack_depth):
@@ -160,7 +165,7 @@ class ReactiveAvoidanceEnv(MiniGridEnv):
             current_agent_coordinates = self._current_agent_coordinates,
             obstacles_coordinates = self.config.environment.obstacles_coordinates,
             grid_dimensions = self.config.environment.grid_dimensions,
-            seekers_coordinates = self._current_seeker_coordinates
+            seekers_coordinates = self._current_seekers_coordinates
         )
         return self._get_obs(), self._get_info() 
 
@@ -197,7 +202,7 @@ class ReactiveAvoidanceEnv(MiniGridEnv):
                        starting_time_steps_to_goal: Optional[int],
                        ending_time_steps_to_goal: Optional[int],
                        episode_length: int,
-                       minimum_distance_to_hazards: dict[Literal["obstacle", "boundary", "seeker"], int],
+                       minimum_distance_to_hazards: dict[Literal["obstacle", "boundary", "seeker"], int | float],
                        collision_type: Optional[str]) -> tuple[np.ndarray, float, bool, bool, dict[str, Any]]:
         """
         Finalizes the step in the environment. Computes and appends the agent's local observation to the local observation history. Computes the episode metrics.
@@ -210,7 +215,7 @@ class ReactiveAvoidanceEnv(MiniGridEnv):
         :param starting_time_steps_to_goal: The minimum number of time steps to the goal at the start of the episode.
         :param ending_time_steps_to_goal: The minimum number of time steps to the goal at the end of the episode.
         :param episode_length: The length of the episode.
-        :param minimum_distance_to_hazards: A dictionary mapping the type of hazard to the agent's minimum Chebyshev distance to the hazard.
+        :param minimum_distance_to_hazards: A dictionary mapping the type of hazard to the agent's minimum distance to the hazard.
         :param collision_type: The type of collision that occurred during the episode.
         :return: A tuple containing the observation, reward, termination flag, truncation flag, and auxiliary info dictionary.
         """
@@ -244,19 +249,21 @@ class ReactiveAvoidanceEnv(MiniGridEnv):
                                                                                              movement_vector = self._action_map[action],
                                                                                              grid_dimensions = self.config.environment.grid_dimensions,
                                                                                              obstacles_coordinates = self.config.environment.obstacles_coordinates,
-                                                                                             seekers_coordinates = frozenset(self._current_seeker_coordinates),
+                                                                                             seekers_coordinates = frozenset(self._current_seekers_coordinates),
                                                                                              goal_coordinates = self.config.agent.goal_coordinates)
         # Update the agent's position in the grid
+        # NOTE: The updated agent coordinates in the grid may not necessarily be valid
         self.agent_pos = (updated_agent_coordinates.x, updated_agent_coordinates.y)
 
         # Compute minimum distance to hazards after moving
+        # NOTE: The updated agent coordinates used to compute the minimum distance to hazards may not necessarily be valid
         current_distance_to_hazards = compute_distance_to_hazards(current_agent_coordinates = updated_agent_coordinates,
                                                                   obstacles_coordinates = self.config.environment.obstacles_coordinates,
                                                                   grid_dimensions = self.config.environment.grid_dimensions,
-                                                                  seekers_coordinates = self._current_seeker_coordinates)
-        self._minimum_distance_to_hazards: dict[Literal["obstacle", "boundary", "seeker"], int] = {
-            key: min(self._minimum_distance_to_hazards[key], value) for key, value in current_distance_to_hazards.items()
-        }
+                                                                  seekers_coordinates = self._current_seekers_coordinates)
+        self._minimum_distance_to_hazards = compute_minimum_distance_to_hazards(current_minimum_distance_to_hazards = self._minimum_distance_to_hazards,
+                                                                                current_distance_to_hazards = current_distance_to_hazards)
+        
 
         # If moving the agent results in a collision, return the current observation and terminate the episode
         if collided:
@@ -265,14 +272,26 @@ class ReactiveAvoidanceEnv(MiniGridEnv):
                 collision_type = "obstacle"
             elif not self.config.environment.grid_dimensions.contains_coordinates(updated_agent_coordinates):
                 collision_type = "boundary"
-            elif updated_agent_coordinates in self._current_seeker_coordinates:
+            elif updated_agent_coordinates in self._current_seekers_coordinates:
                 collision_type = "seeker"
             # After determining the collision type, update the agent's coordinates to the last valid coordinates
             self._current_agent_coordinates = last_valid_agent_coordinates
-            return self._finalize_step(reward = -5, terminated = True, truncated = truncated,
+            # Compute time steps to goal after moving
+            current_time_steps_to_goal = self._time_steps_to_goal_mapping.get(last_valid_agent_coordinates)
+            return self._finalize_step(reward = compute_rewards(goal = goal,
+                                                                collided = collided,
+                                                                intercepted = False,
+                                                                truncated = truncated,
+                                                                current_agent_coordinates = self._current_agent_coordinates,
+                                                                current_seekers_coordinates = self._current_seekers_coordinates,
+                                                                visibility_radius = self.config.agent.visibility_radius,
+                                                                previous_time_steps_to_goal = previous_time_steps_to_goal,
+                                                                current_time_steps_to_goal = current_time_steps_to_goal),
+                                       terminated = True,
+                                       truncated = truncated,
                                        outcome = "collision",
-                                       starting_time_steps_to_goal = self._time_steps_to_goal_mapping.get(self.config.agent.start_coordinates),
-                                       ending_time_steps_to_goal = self._time_steps_to_goal_mapping.get(last_valid_agent_coordinates),
+                                       starting_time_steps_to_goal = self._starting_time_steps_to_goal,
+                                       ending_time_steps_to_goal = current_time_steps_to_goal,
                                        episode_length = self._current_step,
                                        minimum_distance_to_hazards = self._minimum_distance_to_hazards,
                                        collision_type = collision_type)
@@ -280,75 +299,91 @@ class ReactiveAvoidanceEnv(MiniGridEnv):
         # If moving the agent does not result in a collision, update the agent's coordinates
         self._current_agent_coordinates = updated_agent_coordinates
 
-        # If moving the agent results in a goal, return the current observation and terminate the episode
+        # Compute time steps to goal after moving
+        current_time_steps_to_goal = self._time_steps_to_goal_mapping.get(self._current_agent_coordinates)
+
+        # If moving the agent results in reaching the goal, return the current observation and terminate the episode
         if goal:
-            return self._finalize_step(reward = 5, terminated = True, truncated = truncated,
+            return self._finalize_step(reward = compute_rewards(goal = goal,
+                                                                collided = collided,
+                                                                intercepted = False,
+                                                                truncated = truncated,
+                                                                current_agent_coordinates = self._current_agent_coordinates,
+                                                                current_seekers_coordinates = self._current_seekers_coordinates,
+                                                                visibility_radius = self.config.agent.visibility_radius,
+                                                                previous_time_steps_to_goal = previous_time_steps_to_goal,
+                                                                current_time_steps_to_goal = current_time_steps_to_goal),
+                                       terminated = True,
+                                       truncated = truncated,
                                        outcome = "goal",
-                                       starting_time_steps_to_goal = self._time_steps_to_goal_mapping.get(self.config.agent.start_coordinates),
-                                       ending_time_steps_to_goal = self._time_steps_to_goal_mapping.get(self._current_agent_coordinates),
+                                       starting_time_steps_to_goal = self._starting_time_steps_to_goal,
+                                       ending_time_steps_to_goal = current_time_steps_to_goal,
                                        episode_length = self._current_step,
                                        minimum_distance_to_hazards = self._minimum_distance_to_hazards,
                                        collision_type = None)
 
         # Clear the seekers' positions in the grid
-        for coordinates in self._current_seeker_coordinates:
+        for coordinates in self._current_seekers_coordinates:
             self.grid.set(coordinates.x, coordinates.y, None)
         # Move the seekers in the environment
         for i, seeker in enumerate(self.config.seekers):
-            other_seekers_coordinates = frozenset(self._current_seeker_coordinates[:i] + self._current_seeker_coordinates[i+1:])
+            other_seekers_coordinates = frozenset(self._current_seekers_coordinates[:i] + self._current_seekers_coordinates[i+1:])
             # TODO: Implement other policies
-            self._current_seeker_coordinates[i] = move_seeker(current_coordinates = self._current_seeker_coordinates[i],
-                                                              velocity = seeker.velocity,
-                                                              policy = "a-star",
-                                                              current_agent_coordinates = self._current_agent_coordinates,
-                                                              grid_dimensions = self.config.environment.grid_dimensions,
-                                                              obstacles_coordinates = self.config.environment.obstacles_coordinates,
-                                                              other_seekers_coordinates = other_seekers_coordinates,
-                                                              goal_coordinates = self.config.agent.goal_coordinates)
+            self._current_seekers_coordinates[i] = move_seeker(current_coordinates = self._current_seekers_coordinates[i],
+                                                               velocity = seeker.velocity,
+                                                               policy = "a-star",
+                                                               current_agent_coordinates = self._current_agent_coordinates,
+                                                               grid_dimensions = self.config.environment.grid_dimensions,
+                                                               obstacles_coordinates = self.config.environment.obstacles_coordinates,
+                                                               other_seekers_coordinates = other_seekers_coordinates,
+                                                               goal_coordinates = self.config.agent.goal_coordinates)
         # Update the seekers' positions in the grid
-        for coordinates in self._current_seeker_coordinates:
+        for coordinates in self._current_seekers_coordinates:
             self.grid.set(coordinates.x, coordinates.y, Seeker())
 
         # Compute minimum distance to hazards after moving the seekers
         current_distance_to_hazards = compute_distance_to_hazards(current_agent_coordinates = self._current_agent_coordinates,
                                                                   obstacles_coordinates = self.config.environment.obstacles_coordinates,
                                                                   grid_dimensions = self.config.environment.grid_dimensions,
-                                                                  seekers_coordinates = self._current_seeker_coordinates)
-        self._minimum_distance_to_hazards = {key: min(self._minimum_distance_to_hazards[key], value) for key, value in current_distance_to_hazards.items()}
+                                                                  seekers_coordinates = self._current_seekers_coordinates)
+        self._minimum_distance_to_hazards = compute_minimum_distance_to_hazards(current_minimum_distance_to_hazards = self._minimum_distance_to_hazards,
+                                                                                current_distance_to_hazards = current_distance_to_hazards)
 
         # If moving the seekers results in an interception, return the current observation and terminate the episode
-        if self._current_agent_coordinates in self._current_seeker_coordinates:
-            return self._finalize_step(reward = -5, terminated = True, truncated = truncated,
+        if self._current_agent_coordinates in self._current_seekers_coordinates:
+            return self._finalize_step(reward = compute_rewards(goal = goal,
+                                                                collided = collided,
+                                                                intercepted = True,
+                                                                truncated = truncated,
+                                                                current_agent_coordinates = self._current_agent_coordinates,
+                                                                current_seekers_coordinates = self._current_seekers_coordinates,
+                                                                visibility_radius = self.config.agent.visibility_radius,
+                                                                previous_time_steps_to_goal = previous_time_steps_to_goal,
+                                                                current_time_steps_to_goal = current_time_steps_to_goal),
+                                       terminated = True,
+                                       truncated = truncated,
                                        outcome = "interception",
-                                       starting_time_steps_to_goal = self._time_steps_to_goal_mapping.get(self.config.agent.start_coordinates),
-                                       ending_time_steps_to_goal = self._time_steps_to_goal_mapping.get(self._current_agent_coordinates),
+                                       starting_time_steps_to_goal = self._starting_time_steps_to_goal,
+                                       ending_time_steps_to_goal = current_time_steps_to_goal,
                                        episode_length = self._current_step,
                                        minimum_distance_to_hazards = self._minimum_distance_to_hazards,
                                        collision_type = None)
 
-        # Compute time steps to goal after moving
-        current_time_steps_to_goal = self._time_steps_to_goal_mapping.get(self._current_agent_coordinates)
-
-        # Compute progress reward
-        if previous_time_steps_to_goal is None or current_time_steps_to_goal is None:
-            progress_reward = 0.0
-        else:
-            # TODO: Implement coefficient for progress reward
-            progress_reward = (previous_time_steps_to_goal - current_time_steps_to_goal) * 0.05
-        # Linear danger penalty within a Chebyshev radius of 3 cells
-        danger_penalty = 0.0
-        for seeker_coordinates in self._current_seeker_coordinates:
-            distance_to_seeker = chebyshev_distance(self._current_agent_coordinates, seeker_coordinates)
-            if distance_to_seeker < 3:
-                danger_penalty -= 0.1 * (3 - distance_to_seeker) / 3
-        # Step penalty to encourage efficiency
-        step_penalty = -1 / self.config.environment.episode_time_limit
-
         # Otherwise, continue the episode
-        return self._finalize_step(reward = step_penalty + progress_reward + danger_penalty, terminated = False, truncated = truncated,
+        return self._finalize_step(reward = compute_rewards(goal = goal,
+                                                            collided = collided,
+                                                            intercepted = False,
+                                                            truncated = truncated,
+                                                            current_agent_coordinates = self._current_agent_coordinates,
+                                                            current_seekers_coordinates = self._current_seekers_coordinates,
+                                                            visibility_radius = self.config.agent.visibility_radius,
+                                                            previous_time_steps_to_goal = previous_time_steps_to_goal,
+                                                            current_time_steps_to_goal = current_time_steps_to_goal),
+                                   terminated = False,
+                                   truncated = truncated,
                                    outcome = "timeout" if truncated else None,
-                                   starting_time_steps_to_goal = self._time_steps_to_goal_mapping.get(self.config.agent.start_coordinates),
-                                   ending_time_steps_to_goal = self._time_steps_to_goal_mapping.get(self._current_agent_coordinates),
+                                   starting_time_steps_to_goal = self._starting_time_steps_to_goal,
+                                   ending_time_steps_to_goal = current_time_steps_to_goal,
                                    episode_length = self._current_step,
                                    minimum_distance_to_hazards = self._minimum_distance_to_hazards,
                                    collision_type = None)
