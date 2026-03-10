@@ -206,7 +206,7 @@ class ReactiveAvoidanceEnv(MiniGridEnv):
                        ending_time_steps_to_goal: Optional[int],
                        episode_length: int,
                        minimum_distance_to_hazards: dict[Literal["obstacle", "boundary", "seeker"], int | float],
-                       collision_type: Optional[str]) -> tuple[np.ndarray, float, bool, bool, dict[str, Any]]:
+                       collision_type: Optional[Literal["obstacle", "boundary", "seeker"]]) -> tuple[np.ndarray, float, bool, bool, dict[str, Any]]:
         """
         Finalizes the step in the environment. Computes and appends the agent's local observation to the local observation history. Computes the episode metrics.
         Returns a tuple containing the observation, reward, termination flag, truncation flag, and auxiliary info dictionary.
@@ -275,7 +275,7 @@ class ReactiveAvoidanceEnv(MiniGridEnv):
 
         # If moving the agent results in a collision, return the current observation and terminate the episode
         if collided:
-            collision_type = None
+            collision_type: Optional[Literal["obstacle", "boundary", "seeker"]] = None
             if updated_agent_coordinates in self.config.environment.obstacles_coordinates:
                 collision_type = "obstacle"
             elif not self.config.environment.grid_dimensions.contains_coordinates(updated_agent_coordinates):

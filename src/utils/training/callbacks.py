@@ -83,19 +83,40 @@ class RollingMetricsCallback(BaseCallback):
     """
     A callback for computing and logging rolling metrics via the Stable Baselines3 logger.
     """
-    def __init__(self, *, rolling_window_size: int, outcomes: tuple[str, ...] = ("goal", "collision", "interception", "timeout"), verbose: int = 0) -> None:
+    def __init__(self, *,
+                 rolling_window_size: int,
+                 outcomes: tuple[str, ...] = ("goal",
+                                              "collision",
+                                              "interception",
+                                              "timeout"),
+                 numeric_info_keywords: tuple[str, ...] = ("net_progress",
+                                                           "path_efficiency",
+                                                           "minimum_distance_to_obstacle",
+                                                           "minimum_distance_to_boundary",
+                                                           "minimum_distance_to_seeker"),
+                 collision_types: tuple[str, ...] = ("obstacle",
+                                                     "boundary",
+                                                     "seeker"),
+                 verbose: int = 0) -> None:
         """
         Initializes the RollingMetricsCallback object.
         
         :param rolling_window_size: The size of the rolling window used to compute rolling metrics.
         :param outcomes: Possible episode outcomes stored in the info dictionary.
+        :param numeric_info_keywords: Info dictionary keywords corresponding to numeric episode-level metrics.
+        :param collision_types: Possible collision types stored in the info dictionary.
         :param verbose: The verbosity level.
         :return: None.
         """
         super().__init__(verbose = verbose)
         self.rolling_window_size = rolling_window_size
-        self.rolling_outcomes = deque(maxlen = rolling_window_size)
         self.outcomes = outcomes
+        self.numeric_info_keywords = numeric_info_keywords
+        self.collision_types = collision_types
+
+        self.rolling_outcomes = deque(maxlen = rolling_window_size)
+        self.rolling_numeric_metrics = {key: deque(maxlen = rolling_window_size) for key in numeric_info_keywords}
+        self.rolling_collision_types = deque(maxlen = rolling_window_size)
 
     def _on_step(self) -> bool:
         """
@@ -103,27 +124,63 @@ class RollingMetricsCallback(BaseCallback):
         
         :return: Whether to continue training. Always returns True.
         """
+        # Get the info dictionaries returned by each environment in the vectorized environment
         infos = self.locals.get("infos", None)
         if infos is None:
             return True
+
+        # Get whether the episode is done for each environment in the vectorized environment
         dones = self.locals.get("dones", None)
         if dones is None:
+            # Reconstruct dones from terminateds and truncateds
             terminateds = self.locals.get("terminateds", self.locals.get("terminated", None))
             truncateds = self.locals.get("truncateds", self.locals.get("truncated", None))
             if terminateds is None or truncateds is None:
                 return True
             dones = [bool(terminated) or bool(truncated) for terminated, truncated in zip(terminateds, truncateds)]
 
-        for info, done in zip(infos, dones):
-            if done and isinstance(info, dict):
-                outcome = info.get("outcome", None)
-                if outcome is not None:
-                    self.rolling_outcomes.append(outcome)
+        # Get the info dictionaries for finished episodes
+        finished_episodes_info = [info for info, done in zip(infos, dones) if done and isinstance(info, dict)]
 
+        # If no episodes finished, return True
+        if not finished_episodes_info:
+            return True
+
+        # Store episode-level metrics in rolling windows
+        for info in finished_episodes_info:
+            outcome = info.get("outcome", None)
+            if outcome is not None:
+                self.rolling_outcomes.append(outcome)
+            
+            for info_keyword in self.numeric_info_keywords:
+                value = info.get(info_keyword)
+                if not isinstance(value, (int, float)):
+                    continue
+                self.rolling_numeric_metrics[info_keyword].append(float(value))
+                # Log the mean of each episodic-level metric over the finished episodes
+                self.logger.record_mean(f"episode/{info_keyword}", float(value))
+
+            collision_type = info.get("collision_type")
+            if collision_type is not None:
+                self.rolling_collision_types.append(collision_type)
+
+        # Compute rolling outcome rates
         if self.rolling_outcomes:
             counts = Counter(self.rolling_outcomes)
             total = len(self.rolling_outcomes)
             for outcome in self.outcomes:
                 self.logger.record(f"outcomes/{outcome}_rate", counts.get(outcome, 0) / total)
+        
+        # Compute rolling means for numeric episode-level metrics
+        for info_keyword, values in self.rolling_numeric_metrics.items():
+            if values:
+                self.logger.record(f"rolling/{info_keyword}_mean", sum(values) / len(values))
+
+        # Compute rolling collision type rates
+        if self.rolling_collision_types:
+            counts = Counter(self.rolling_collision_types)
+            total = len(self.rolling_collision_types)
+            for collision_type in self.collision_types:
+                self.logger.record(f"collision_type/{collision_type}_rate", counts.get(collision_type, 0) / total)
 
         return True

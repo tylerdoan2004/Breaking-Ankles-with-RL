@@ -227,7 +227,7 @@ def compute_episode_metrics(*,
                             ending_time_steps_to_goal: Optional[int],
                             episode_length: int,
                             minimum_distance_to_hazards: dict[Literal["obstacle", "boundary", "seeker"], int | float],
-                            collision_type: Optional[str]) -> dict[str, Optional[Union[int, float, str]]]:
+                            collision_type: Optional[Literal["obstacle", "boundary", "seeker"]]) -> dict[str, Optional[Union[int, float, str]]]:
     """
     Computes the metrics for an episode.
     
