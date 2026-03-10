@@ -1,3 +1,6 @@
+"""
+This module provides helper functions for logging experiment data.
+"""
 import importlib.metadata
 import platform
 import shutil
