@@ -3,6 +3,7 @@ This module provides the SystemConfiguration, AgentConfiguration, SeekerConfigur
 """
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Literal
 from src.utils.yaml_parser.helpers import (
     is_agent_config_shallowly_valid,
     is_coordinates_data_valid,
@@ -63,6 +64,7 @@ class SeekerConfiguration:
     """
     start_coordinates: Coordinates
     velocity: int
+    policy: Literal["random", "greedy", "a-star"]
 
     @staticmethod
     def from_dict(seeker_config: dict) -> "SeekerConfiguration":
@@ -77,7 +79,8 @@ class SeekerConfiguration:
 
         return SeekerConfiguration(
             start_coordinates = Coordinates.from_list(seeker_config["start_coordinates"]),
-            velocity = seeker_config["velocity"]
+            velocity = seeker_config["velocity"],
+            policy = seeker_config["policy"]
         )
 
 

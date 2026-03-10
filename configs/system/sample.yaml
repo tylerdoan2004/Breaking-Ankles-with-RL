@@ -21,5 +21,7 @@ agent:
 seekers:
   - start_coordinates: [1, 8]
     velocity: 1
+    policy: "greedy"
   - start_coordinates: [8, 1]
     velocity: 1
+    policy: "greedy"

@@ -94,6 +94,16 @@ def is_velocity_valid(velocity: int) -> bool:
     return isinstance(velocity, int) and velocity > 0
 
 
+def is_policy_valid(policy: str) -> bool:
+    """
+    Checks if the specified policy is valid.
+    
+    :param policy: The policy to check.
+    :return: True if the policy is valid, False otherwise.
+    """
+    return isinstance(policy, str) and policy in {"random", "greedy", "a-star"}
+
+
 def is_visibility_radius_valid(visibility_radius: int) -> bool:
     """
     Checks if the specified visibility radius is valid.
@@ -170,9 +180,11 @@ def is_seeker_config_shallowly_valid(data: Any) -> bool:
     """
     if not isinstance(data, dict):
         return False
-    if set(data.keys()) != {"start_coordinates", "velocity"}:
+    if set(data.keys()) != {"start_coordinates", "velocity", "policy"}:
         return False
     if not is_velocity_valid(data["velocity"]):
+        return False
+    if not is_policy_valid(data["policy"]):
         return False
     return True
 

@@ -204,5 +204,7 @@ agent:
 seekers:
   - start_coordinates: [4, 18]
     velocity: 1
+    policy: "greedy"
   - start_coordinates: [17, 26]
     velocity: 1
+    policy: "greedy"
