@@ -16,6 +16,7 @@ from src.utils.environment.helpers import (
     compute_offset_to_line_mapping,
     compute_rewards,
     compute_time_steps_to_goal_mapping,
+    compute_visible_seekers,
     scale_absolute_coordinates,
     scale_relative_vector,
     move_agent,
@@ -71,6 +72,7 @@ class ReactiveAvoidanceEnv(MiniGridEnv):
         self._current_local_observation_history: deque[np.ndarray] = deque(maxlen = config.agent.observation_stack_depth)
         for _ in range(config.agent.observation_stack_depth):
             self._current_local_observation_history.append(current_local_observation)
+        self._num_consecutive_idle_steps = 0
 
         # Override the default action space and observation space
         self.action_space = Discrete(len(MOVEMENT_VECTORS))
@@ -100,12 +102,12 @@ class ReactiveAvoidanceEnv(MiniGridEnv):
         for dx in range(-visibility_radius, visibility_radius + 1):
             for dy in range(-visibility_radius, visibility_radius + 1):
                 current_visibility_offset = Vector(dx, dy)
-                current_cell_coordinates = self._current_agent_coordinates + current_visibility_offset
                 current_agent_offset = Vector(self._current_agent_coordinates.x, self._current_agent_coordinates.y)
                 current_visibility_ray = [coordinates + current_agent_offset for coordinates in self._visibility_rays[current_visibility_offset]]
                 if not can_see(current_visibility_ray, self.config.environment.obstacles_coordinates):
                     local_observation[0, dx + visibility_radius, dy + visibility_radius] = 1.0
                     continue
+                current_cell_coordinates = self._current_agent_coordinates + current_visibility_offset
                 if not self.config.environment.grid_dimensions.contains_coordinates(current_cell_coordinates):
                     local_observation[1, dx + visibility_radius, dy + visibility_radius] = 1.0
                     continue
@@ -161,6 +163,7 @@ class ReactiveAvoidanceEnv(MiniGridEnv):
         self._current_local_observation_history = deque(maxlen = self.config.agent.observation_stack_depth)
         for _ in range(self.config.agent.observation_stack_depth):
             self._current_local_observation_history.append(current_local_observation)
+        self._num_consecutive_idle_steps = 0
         self._minimum_distance_to_hazards = compute_distance_to_hazards(
             current_agent_coordinates = self._current_agent_coordinates,
             obstacles_coordinates = self.config.environment.obstacles_coordinates,
@@ -237,6 +240,11 @@ class ReactiveAvoidanceEnv(MiniGridEnv):
         """
         action = cast(int, action)
         self._current_step += 1
+
+        # Get the movement vector corresponding to the action
+        movement_vector = self._action_map[action]
+
+        # Compute whether the episode is truncated
         truncated = self._current_step >= self.config.environment.episode_time_limit
 
         # Compute time steps to goal before moving
@@ -246,7 +254,7 @@ class ReactiveAvoidanceEnv(MiniGridEnv):
         # NOTE: The updated agent coordinates may not necessarily be valid
         updated_agent_coordinates, last_valid_agent_coordinates, collided, goal = move_agent(current_coordinates = self._current_agent_coordinates,
                                                                                              velocity = self.config.agent.velocity,
-                                                                                             movement_vector = self._action_map[action],
+                                                                                             movement_vector = movement_vector,
                                                                                              grid_dimensions = self.config.environment.grid_dimensions,
                                                                                              obstacles_coordinates = self.config.environment.obstacles_coordinates,
                                                                                              seekers_coordinates = frozenset(self._current_seekers_coordinates),
@@ -276,17 +284,27 @@ class ReactiveAvoidanceEnv(MiniGridEnv):
                 collision_type = "seeker"
             # After determining the collision type, update the agent's coordinates to the last valid coordinates
             self._current_agent_coordinates = last_valid_agent_coordinates
+            # Compute the currently visible seekers' coordinates after the agent has moved
+            currently_visible_seekers_coordinates = compute_visible_seekers(current_agent_coordinates = last_valid_agent_coordinates,
+                                                                            current_seekers_coordinates = self._current_seekers_coordinates,
+                                                                            visibility_radius = self.config.agent.visibility_radius,
+                                                                            visibility_rays = self._visibility_rays,
+                                                                            obstacles_coordinates = self.config.environment.obstacles_coordinates)
             # Compute time steps to goal after moving
             current_time_steps_to_goal = self._time_steps_to_goal_mapping.get(last_valid_agent_coordinates)
+            # If moving the agent results in a collision, the agent is not idling
+            self._num_consecutive_idle_steps = 0
             return self._finalize_step(reward = compute_rewards(goal = goal,
                                                                 collided = collided,
                                                                 intercepted = False,
                                                                 truncated = truncated,
-                                                                current_agent_coordinates = self._current_agent_coordinates,
-                                                                current_seekers_coordinates = self._current_seekers_coordinates,
-                                                                visibility_radius = self.config.agent.visibility_radius,
                                                                 previous_time_steps_to_goal = previous_time_steps_to_goal,
-                                                                current_time_steps_to_goal = current_time_steps_to_goal),
+                                                                current_time_steps_to_goal = current_time_steps_to_goal,
+                                                                current_agent_coordinates = self._current_agent_coordinates,
+                                                                currently_visible_seekers_coordinates = currently_visible_seekers_coordinates,
+                                                                visibility_radius = self.config.agent.visibility_radius,
+                                                                idling = False,
+                                                                num_consecutive_idle_steps = self._num_consecutive_idle_steps),
                                        terminated = True,
                                        truncated = truncated,
                                        outcome = "collision",
@@ -299,20 +317,31 @@ class ReactiveAvoidanceEnv(MiniGridEnv):
         # If moving the agent does not result in a collision, update the agent's coordinates
         self._current_agent_coordinates = updated_agent_coordinates
 
+        # Compute the currently visible seekers' coordinates after the agent's coordinates have been updated
+        currently_visible_seekers_coordinates = compute_visible_seekers(current_agent_coordinates = self._current_agent_coordinates,
+                                                                        current_seekers_coordinates = self._current_seekers_coordinates,
+                                                                        visibility_radius = self.config.agent.visibility_radius,
+                                                                        visibility_rays = self._visibility_rays,
+                                                                        obstacles_coordinates = self.config.environment.obstacles_coordinates)
+
         # Compute time steps to goal after moving
         current_time_steps_to_goal = self._time_steps_to_goal_mapping.get(self._current_agent_coordinates)
 
         # If moving the agent results in reaching the goal, return the current observation and terminate the episode
         if goal:
+            # If moving the agent results in reaching the goal, the agent is not idling
+            self._num_consecutive_idle_steps = 0
             return self._finalize_step(reward = compute_rewards(goal = goal,
                                                                 collided = collided,
                                                                 intercepted = False,
                                                                 truncated = truncated,
-                                                                current_agent_coordinates = self._current_agent_coordinates,
-                                                                current_seekers_coordinates = self._current_seekers_coordinates,
-                                                                visibility_radius = self.config.agent.visibility_radius,
                                                                 previous_time_steps_to_goal = previous_time_steps_to_goal,
-                                                                current_time_steps_to_goal = current_time_steps_to_goal),
+                                                                current_time_steps_to_goal = current_time_steps_to_goal,
+                                                                current_agent_coordinates = self._current_agent_coordinates,
+                                                                currently_visible_seekers_coordinates = currently_visible_seekers_coordinates,
+                                                                visibility_radius = self.config.agent.visibility_radius,
+                                                                idling = False,
+                                                                num_consecutive_idle_steps = self._num_consecutive_idle_steps),
                                        terminated = True,
                                        truncated = truncated,
                                        outcome = "goal",
@@ -341,6 +370,13 @@ class ReactiveAvoidanceEnv(MiniGridEnv):
         for coordinates in self._current_seekers_coordinates:
             self.grid.set(coordinates.x, coordinates.y, Seeker())
 
+        # Compute the currently visible seekers' coordinates after the seekers' coordinates have been updated
+        currently_visible_seekers_coordinates = compute_visible_seekers(current_agent_coordinates = self._current_agent_coordinates,
+                                                                        current_seekers_coordinates = self._current_seekers_coordinates,
+                                                                        visibility_radius = self.config.agent.visibility_radius,
+                                                                        visibility_rays = self._visibility_rays,
+                                                                        obstacles_coordinates = self.config.environment.obstacles_coordinates)
+
         # Compute minimum distance to hazards after moving the seekers
         current_distance_to_hazards = compute_distance_to_hazards(current_agent_coordinates = self._current_agent_coordinates,
                                                                   obstacles_coordinates = self.config.environment.obstacles_coordinates,
@@ -349,17 +385,26 @@ class ReactiveAvoidanceEnv(MiniGridEnv):
         self._minimum_distance_to_hazards = compute_minimum_distance_to_hazards(current_minimum_distance_to_hazards = self._minimum_distance_to_hazards,
                                                                                 current_distance_to_hazards = current_distance_to_hazards)
 
+        # Compute whether the agent is idling
+        idling = (movement_vector == Vector(0, 0)) and (len(currently_visible_seekers_coordinates) == 0)
+        if idling:
+            self._num_consecutive_idle_steps += 1
+        else:
+            self._num_consecutive_idle_steps = 0
+
         # If moving the seekers results in an interception, return the current observation and terminate the episode
         if self._current_agent_coordinates in self._current_seekers_coordinates:
             return self._finalize_step(reward = compute_rewards(goal = goal,
                                                                 collided = collided,
                                                                 intercepted = True,
                                                                 truncated = truncated,
-                                                                current_agent_coordinates = self._current_agent_coordinates,
-                                                                current_seekers_coordinates = self._current_seekers_coordinates,
-                                                                visibility_radius = self.config.agent.visibility_radius,
                                                                 previous_time_steps_to_goal = previous_time_steps_to_goal,
-                                                                current_time_steps_to_goal = current_time_steps_to_goal),
+                                                                current_time_steps_to_goal = current_time_steps_to_goal,
+                                                                current_agent_coordinates = self._current_agent_coordinates,
+                                                                currently_visible_seekers_coordinates = currently_visible_seekers_coordinates,
+                                                                visibility_radius = self.config.agent.visibility_radius,
+                                                                idling = idling,
+                                                                num_consecutive_idle_steps = self._num_consecutive_idle_steps),
                                        terminated = True,
                                        truncated = truncated,
                                        outcome = "interception",
@@ -374,11 +419,13 @@ class ReactiveAvoidanceEnv(MiniGridEnv):
                                                             collided = collided,
                                                             intercepted = False,
                                                             truncated = truncated,
-                                                            current_agent_coordinates = self._current_agent_coordinates,
-                                                            current_seekers_coordinates = self._current_seekers_coordinates,
-                                                            visibility_radius = self.config.agent.visibility_radius,
                                                             previous_time_steps_to_goal = previous_time_steps_to_goal,
-                                                            current_time_steps_to_goal = current_time_steps_to_goal),
+                                                            current_time_steps_to_goal = current_time_steps_to_goal,
+                                                            current_agent_coordinates = self._current_agent_coordinates,
+                                                            currently_visible_seekers_coordinates = currently_visible_seekers_coordinates,
+                                                            visibility_radius = self.config.agent.visibility_radius,
+                                                            idling = idling,
+                                                            num_consecutive_idle_steps = self._num_consecutive_idle_steps),
                                    terminated = False,
                                    truncated = truncated,
                                    outcome = "timeout" if truncated else None,

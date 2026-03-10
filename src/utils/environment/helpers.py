@@ -542,26 +542,47 @@ def compute_progress_rewards(*,
 
 def compute_danger_penalty(*,
                            current_agent_coordinates: Coordinates,
-                           current_seekers_coordinates: Iterable[Coordinates],
+                           currently_visible_seekers_coordinates: Iterable[Coordinates],
                            visibility_radius: int,
                            distance_metric: Callable[[Coordinates, Coordinates], int | float] = chebyshev_distance,
                            danger_coefficient: float = 0.01) -> float:
     """
-    Computes the reward term associated with the agent's danger level in the environment.
+    Computes the penalty term associated with the agent's danger level in the environment.
 
     :param current_agent_coordinates: The current coordinates of the agent.
-    :param current_seekers_coordinates: The current coordinates of the seekers.
+    :param currently_visible_seekers_coordinates: The coordinates of the seekers currently visible to the agent.
     :param visibility_radius: The visibility radius of the agent.
     :param distance_metric: The distance metric to use for computing the distance between the agent and a seeker.
-    :param danger_coefficient: The coefficient for the danger reward term.
-    :return: The reward term associated with the agent's danger level in the environment.
+    :param danger_coefficient: The coefficient for the danger penalty term.
+    :return: The penalty term associated with the agent's danger level in the environment.
     """
     danger_penalty = 0.0
-    for seeker_coordinates in current_seekers_coordinates:
+    for seeker_coordinates in currently_visible_seekers_coordinates:
         distance_to_seeker = distance_metric(current_agent_coordinates, seeker_coordinates)
         if distance_to_seeker < visibility_radius:
-            danger_penalty -= danger_coefficient * (1 - distance_to_seeker / visibility_radius)
+            danger_penalty += danger_coefficient * (1 - distance_to_seeker / visibility_radius)
     return danger_penalty
+
+
+def compute_idling_penalty(*,
+                           idling: bool,
+                           num_consecutive_idle_steps: int,
+                           max_consecutive_idle_steps_to_penalize: int = 5,
+                           base_idling_penalty: float = 0.025,
+                           idling_coefficient: float = 0.005) -> float:
+    """
+    Computes the penalty term associated with the agent idling in the environment.
+    
+    :param idling: Whether the agent is idling.
+    :param num_consecutive_idle_steps: The number of consecutive idle steps.
+    :param max_consecutive_idle_steps_to_penalize: The maximum number of consecutive idle steps to penalize.
+    :param base_idling_penalty: The base penalty for idling.
+    :param idling_coefficient: The coefficient for the idling penalty term.
+    :return: The penalty term associated with the agent idling in the environment.
+    """
+    if not idling:
+        return 0.0
+    return base_idling_penalty + idling_coefficient * min(num_consecutive_idle_steps, max_consecutive_idle_steps_to_penalize)
 
 
 def compute_rewards(*, 
@@ -569,14 +590,19 @@ def compute_rewards(*,
                     collided: bool,
                     intercepted: bool,
                     truncated: bool,
+                    previous_time_steps_to_goal: Optional[int] = None,
+                    current_time_steps_to_goal: Optional[int] = None,
+                    progress_coefficient: float = 0.1,
                     current_agent_coordinates: Coordinates,
-                    current_seekers_coordinates: Iterable[Coordinates],
+                    currently_visible_seekers_coordinates: Iterable[Coordinates],
                     visibility_radius: int,
                     distance_metric: Callable[[Coordinates, Coordinates], int | float] = chebyshev_distance,
                     danger_coefficient: float = 0.01,
-                    previous_time_steps_to_goal: Optional[int] = None,
-                    current_time_steps_to_goal: Optional[int] = None,
-                    progress_coefficient: float = 0.05,
+                    idling: bool,
+                    num_consecutive_idle_steps: int,
+                    max_consecutive_idle_steps_to_penalize: int = 5,
+                    base_idling_penalty: float = 0.025,
+                    idling_coefficient: float = 0.005,
                     step_penalty: float = 0.01) -> float:
     """
     Computes the agent's reward for performing an action in the environment.
@@ -585,27 +611,54 @@ def compute_rewards(*,
     :param collided: Whether the agent collided with an obstacle, a seeker, or an out-of-bounds cell.
     :param intercepted: Whether the agent was intercepted by a seeker.
     :param truncated: Whether the episode was truncated.
-    :param current_agent_coordinates: The current coordinates of the agent.
-    :param current_seekers_coordinates: The current coordinates of the seekers.
-    :param visibility_radius: The visibility radius of the agent.
-    :param distance_metric: The distance metric to use for computing the distance between the agent and a seeker.
-    :param danger_coefficient: The coefficient for the danger reward term.
     :param previous_time_steps_to_goal: The previous minimum number of time steps to reach the goal.
     :param current_time_steps_to_goal: The current minimum number of time steps to reach the goal.
     :param progress_coefficient: The coefficient for the progress reward term.
-    :param step_penalty: The penalty for each time step.
+    :param current_agent_coordinates: The current coordinates of the agent.
+    :param currently_visible_seekers_coordinates: The coordinates of the seekers currently visible to the agent.
+    :param visibility_radius: The visibility radius of the agent.
+    :param distance_metric: The distance metric to use for computing the distance between the agent and a seeker.
+    :param danger_coefficient: The coefficient for the danger penalty term.
+    :param step_penalty: The penalty term for each time step.
     :return: The agent's reward for performing an action in the environment.
     """
     terminal_rewards = compute_terminal_rewards(goal = goal,
                                                 collided = collided,
                                                 intercepted = intercepted,
                                                 truncated = truncated)
-    danger_penalty = compute_danger_penalty(current_agent_coordinates = current_agent_coordinates,
-                                            current_seekers_coordinates = current_seekers_coordinates,
-                                            visibility_radius = visibility_radius,
-                                            distance_metric = distance_metric,
-                                            danger_coefficient = danger_coefficient)
     progress_rewards = compute_progress_rewards(previous_time_steps_to_goal = previous_time_steps_to_goal,
                                                 current_time_steps_to_goal = current_time_steps_to_goal,
                                                 progress_coefficient = progress_coefficient)
-    return terminal_rewards + danger_penalty + progress_rewards - step_penalty
+    danger_penalty = compute_danger_penalty(current_agent_coordinates = current_agent_coordinates,
+                                            currently_visible_seekers_coordinates = currently_visible_seekers_coordinates,
+                                            visibility_radius = visibility_radius,
+                                            distance_metric = distance_metric,
+                                            danger_coefficient = danger_coefficient)
+    idling_penalty = compute_idling_penalty(idling = idling,
+                                            num_consecutive_idle_steps = num_consecutive_idle_steps,
+                                            max_consecutive_idle_steps_to_penalize = max_consecutive_idle_steps_to_penalize,
+                                            base_idling_penalty = base_idling_penalty,
+                                            idling_coefficient = idling_coefficient)
+    return terminal_rewards + progress_rewards - danger_penalty - idling_penalty - step_penalty
+
+
+def compute_visible_seekers(*,
+                            current_agent_coordinates: Coordinates,
+                            current_seekers_coordinates: Iterable[Coordinates],
+                            visibility_radius: int,
+                            visibility_rays: dict[Vector, list[Coordinates]],
+                            obstacles_coordinates: AbstractSet[Coordinates]) -> list[Coordinates]:
+    """
+    Computes the coordinates of the seekers visible to the agent.
+    """
+    visible_seekers = []
+    agent_offset = Vector(current_agent_coordinates.x, current_agent_coordinates.y)
+    for seeker_coordinates in current_seekers_coordinates:
+        if chebyshev_distance(current_agent_coordinates, seeker_coordinates) > visibility_radius:
+            continue
+        seeker_offset = seeker_coordinates - current_agent_coordinates
+        visibility_ray = [coordinates + agent_offset for coordinates in visibility_rays[seeker_offset]]
+        if not can_see(visibility_ray, obstacles_coordinates):
+            continue
+        visible_seekers.append(seeker_coordinates)
+    return visible_seekers
