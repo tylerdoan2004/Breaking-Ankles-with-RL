@@ -1,6 +1,7 @@
 """
 A configuration file for a reactive avoidance experiment.
 """
+from typing import Callable
 from src.utils.logging.experiment_metadata import (
     EvaluationMetadata,
     LoggingDirectoriesMetadata,
@@ -12,6 +13,25 @@ from src.utils.logging.experiment_metadata import (
 )
 
 
+def linear_scheduler_factory(initial_value: float, final_value: float) -> Callable[[float], float]:
+    """
+    Factory function for a linear scheduler.
+    
+    :param initial_value: The initial value of the scheduler.
+    :param final_value: The final value of the scheduler.
+    :return: A linear scheduler that linearly interpolates between the initial and final values.
+    """
+    def linear_scheduler(progress_remaining: float) -> float:
+        """
+        Linear scheduler that linearly interpolates between the initial and final values.
+        
+        :param progress_remaining: The remaining progress of the experiment. Should be between 0.0 and 1.0.
+        :return: The interpolated value between the initial and final values.
+        """
+        return final_value + (initial_value - final_value) * progress_remaining
+    return linear_scheduler
+
+
 LOGGING_DIRECTORY = "logs"
 EXPERIMENT_NAME = "reactive_avoidance"
 SEED = 0
@@ -20,7 +40,7 @@ MODEL = ModelMetadata(
     # NOTE: Default model hyperparameters obtained from https://stable-baselines3.readthedocs.io/en/master/modules/ppo.html
     hyperparameters = {
         "policy": "MlpPolicy",
-        "learning_rate": 0.0003,
+        "learning_rate": linear_scheduler_factory(0.0003, 0.0001),
         "n_steps": 2048,
         "batch_size": 64,
         "n_epochs": 10,
