@@ -1,3 +1,6 @@
+"""
+This module provides the main training and evaluation loop for the PPO agent.
+"""
 from datetime import datetime, timezone
 from stable_baselines3 import PPO
 from stable_baselines3.common.callbacks import CheckpointCallback, CallbackList, EvalCallback
