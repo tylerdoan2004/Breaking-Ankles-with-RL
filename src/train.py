@@ -2,7 +2,7 @@ from datetime import datetime, timezone
 from stable_baselines3 import PPO
 from stable_baselines3.common.callbacks import CheckpointCallback, CallbackList, EvalCallback
 from stable_baselines3.common.vec_env import VecMonitor
-from configs.experiments.reactive_avoidance import (
+from configs.experiments.ppo import (
     LOGGING_DIRECTORY, EXPERIMENT_NAME, SEED, MODEL, SYSTEM_CONFIGURATIONS, TRAINING_METADATA, LOGGING_METADATA
 )
 from src.utils.environment.environment_creation import make_vectorized_environment, make_video_recordable_environment_factory, validate_environment
