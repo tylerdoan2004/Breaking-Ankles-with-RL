@@ -546,7 +546,7 @@ def compute_danger_penalty(*,
                            currently_visible_seekers_coordinates: Iterable[Coordinates],
                            visibility_radius: int,
                            distance_metric: Callable[[Coordinates, Coordinates], int | float] = chebyshev_distance,
-                           danger_coefficient: float = 0.025) -> float:
+                           danger_coefficient: float = 0.015) -> float:
     """
     Computes the penalty term associated with the agent's danger level in the environment.
 
@@ -629,7 +629,7 @@ def compute_rewards(*,
                     currently_visible_seekers_coordinates: Sequence[Coordinates],
                     visibility_radius: int,
                     distance_metric: Callable[[Coordinates, Coordinates], int | float] = chebyshev_distance,
-                    danger_coefficient: float = 0.025,
+                    danger_coefficient: float = 0.015,
                     num_consecutive_penalizable_nonprogress_steps: int,
                     max_consecutive_penalizable_nonprogress_steps_to_penalize: int = 5,
                     base_nonprogress_penalty: float = 0.025,
