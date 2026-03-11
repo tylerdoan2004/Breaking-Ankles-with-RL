@@ -3,6 +3,7 @@ This module provides helper functions for the reactive avoidance environment.
 """
 import numpy as np
 from collections import deque
+from collections.abc import Sequence
 from collections.abc import Set as AbstractSet
 from heapq import heappop, heappush
 from random import choice
@@ -549,7 +550,7 @@ def compute_danger_penalty(*,
     """
     Computes the penalty term associated with the agent's danger level in the environment.
 
-    :param current_agent_coordinates: The current coordinates of the agent.
+    :param current_agent_coordinates: The current coordinates of the agent after the agent's move.
     :param currently_visible_seekers_coordinates: The coordinates of the seekers currently visible to the agent.
     :param visibility_radius: The visibility radius of the agent.
     :param distance_metric: The distance metric to use for computing the distance between the agent and a seeker.
@@ -564,25 +565,56 @@ def compute_danger_penalty(*,
     return danger_penalty
 
 
-def compute_idling_penalty(*,
-                           idling: bool,
-                           num_consecutive_idle_steps: int,
-                           max_consecutive_idle_steps_to_penalize: int = 5,
-                           base_idling_penalty: float = 0.025,
-                           idling_coefficient: float = 0.005) -> float:
+def is_nonprogressive_move(*,
+                           previous_time_steps_to_goal: Optional[int],
+                           current_time_steps_to_goal: Optional[int]) -> bool:
     """
-    Computes the penalty term associated with the agent idling in the environment.
+    Computes whether the agent's move was nonprogressive.
     
-    :param idling: Whether the agent is idling.
-    :param num_consecutive_idle_steps: The number of consecutive idle steps.
-    :param max_consecutive_idle_steps_to_penalize: The maximum number of consecutive idle steps to penalize.
-    :param base_idling_penalty: The base penalty for idling.
-    :param idling_coefficient: The coefficient for the idling penalty term.
-    :return: The penalty term associated with the agent idling in the environment.
+    :param previous_time_steps_to_goal: The previous minimum number of time steps to reach the goal before the agent's move.
+    :param current_time_steps_to_goal: The current minimum number of time steps to reach the goal after the agent's move.
     """
-    if not idling:
+    return (
+        previous_time_steps_to_goal is not None
+        and current_time_steps_to_goal is not None
+        and current_time_steps_to_goal >= previous_time_steps_to_goal
+    )
+
+
+def is_nonprogress_penalizable(*,
+                               previous_time_steps_to_goal: Optional[int],
+                               current_time_steps_to_goal: Optional[int],
+                               previously_visible_seekers_coordinates: Sequence[Coordinates]) -> bool:
+    """
+    Computes whether the agent's move should be penalized for not making progress towards the goal.
+    
+    :param previous_time_steps_to_goal: The previous minimum number of time steps to reach the goal before the agent's move.
+    :param current_time_steps_to_goal: The current minimum number of time steps to reach the goal after the agent's move.
+    :param previously_visible_seekers_coordinates: The coordinates of the seekers visible to the agent before the agent's move.
+
+    :return: Whether the agent's move should be penalized for not making progress towards the goal.
+    """
+    return is_nonprogressive_move(previous_time_steps_to_goal = previous_time_steps_to_goal,
+                                  current_time_steps_to_goal = current_time_steps_to_goal) and len(previously_visible_seekers_coordinates) == 0
+
+
+def compute_nonprogress_penalty(*,
+                                num_consecutive_penalizable_nonprogress_steps: int,
+                                max_consecutive_penalizable_nonprogress_steps_to_penalize: int = 5,
+                                base_nonprogress_penalty: float = 0.025,
+                                nonprogress_coefficient: float = 0.005) -> float:
+    """
+    Computes the penalty term associated with the agent not making progress towards the goal.
+
+    :param num_consecutive_penalizable_nonprogress_steps: The number of consecutive penalizable nonprogressive moves.
+    :param max_consecutive_penalizable_nonprogress_steps_to_penalize: The maximum number of consecutive penalizable nonprogressive moves to penalize.
+    :param base_nonprogress_penalty: The base penalty term associated with the agent not making progress towards the goal.
+    :param nonprogress_coefficient: The coefficient for the nonprogress penalty term.
+    :return: The penalty term associated with the agent not making progress towards the goal.
+    """
+    if num_consecutive_penalizable_nonprogress_steps == 0:
         return 0.0
-    return base_idling_penalty + idling_coefficient * min(num_consecutive_idle_steps, max_consecutive_idle_steps_to_penalize)
+    return base_nonprogress_penalty + nonprogress_coefficient * min(num_consecutive_penalizable_nonprogress_steps, max_consecutive_penalizable_nonprogress_steps_to_penalize)
 
 
 def compute_rewards(*, 
@@ -594,15 +626,14 @@ def compute_rewards(*,
                     current_time_steps_to_goal: Optional[int] = None,
                     progress_coefficient: float = 0.1,
                     current_agent_coordinates: Coordinates,
-                    currently_visible_seekers_coordinates: Iterable[Coordinates],
+                    currently_visible_seekers_coordinates: Sequence[Coordinates],
                     visibility_radius: int,
                     distance_metric: Callable[[Coordinates, Coordinates], int | float] = chebyshev_distance,
                     danger_coefficient: float = 0.01,
-                    idling: bool,
-                    num_consecutive_idle_steps: int,
-                    max_consecutive_idle_steps_to_penalize: int = 5,
-                    base_idling_penalty: float = 0.025,
-                    idling_coefficient: float = 0.005,
+                    num_consecutive_penalizable_nonprogress_steps: int,
+                    max_consecutive_penalizable_nonprogress_steps_to_penalize: int = 5,
+                    base_nonprogress_penalty: float = 0.025,
+                    nonprogress_coefficient: float = 0.005,
                     step_penalty: float = 0.01) -> float:
     """
     Computes the agent's reward for performing an action in the environment.
@@ -614,11 +645,15 @@ def compute_rewards(*,
     :param previous_time_steps_to_goal: The previous minimum number of time steps to reach the goal.
     :param current_time_steps_to_goal: The current minimum number of time steps to reach the goal.
     :param progress_coefficient: The coefficient for the progress reward term.
-    :param current_agent_coordinates: The current coordinates of the agent.
-    :param currently_visible_seekers_coordinates: The coordinates of the seekers currently visible to the agent.
+    :param current_agent_coordinates: The current coordinates of the agent after the agent's move.
+    :param currently_visible_seekers_coordinates: The coordinates of the seekers currently visible to the agent after the agent's move.
     :param visibility_radius: The visibility radius of the agent.
     :param distance_metric: The distance metric to use for computing the distance between the agent and a seeker.
     :param danger_coefficient: The coefficient for the danger penalty term.
+    :param num_consecutive_penalizable_nonprogress_steps: The number of consecutive penalizable nonprogressive moves.
+    :param max_consecutive_penalizable_nonprogress_steps_to_penalize: The maximum number of consecutive penalizable nonprogressive moves to penalize.
+    :param base_nonprogress_penalty: The base penalty term associated with the agent not making progress towards the goal.
+    :param nonprogress_coefficient: The coefficient for the nonprogress penalty term.
     :param step_penalty: The penalty term for each time step.
     :return: The agent's reward for performing an action in the environment.
     """
@@ -634,12 +669,11 @@ def compute_rewards(*,
                                             visibility_radius = visibility_radius,
                                             distance_metric = distance_metric,
                                             danger_coefficient = danger_coefficient)
-    idling_penalty = compute_idling_penalty(idling = idling,
-                                            num_consecutive_idle_steps = num_consecutive_idle_steps,
-                                            max_consecutive_idle_steps_to_penalize = max_consecutive_idle_steps_to_penalize,
-                                            base_idling_penalty = base_idling_penalty,
-                                            idling_coefficient = idling_coefficient)
-    return terminal_rewards + progress_rewards - danger_penalty - idling_penalty - step_penalty
+    nonprogress_penalty = compute_nonprogress_penalty(num_consecutive_penalizable_nonprogress_steps = num_consecutive_penalizable_nonprogress_steps,
+                                                      max_consecutive_penalizable_nonprogress_steps_to_penalize = max_consecutive_penalizable_nonprogress_steps_to_penalize,
+                                                      base_nonprogress_penalty = base_nonprogress_penalty,
+                                                      nonprogress_coefficient = nonprogress_coefficient)
+    return terminal_rewards + progress_rewards - danger_penalty - nonprogress_penalty - step_penalty
 
 
 def compute_visible_seekers(*,
