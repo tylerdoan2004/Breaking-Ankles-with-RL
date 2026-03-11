@@ -1,5 +1,5 @@
 """
-A configuration file for a reactive avoidance experiment.
+A configuration file for a PPO experiment.
 """
 from typing import Callable
 from src.utils.logging.experiment_metadata import (
