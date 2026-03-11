@@ -260,6 +260,8 @@ class ReactiveAvoidanceEnv(MiniGridEnv):
                                                                     visibility_radius = self.config.agent.visibility_radius,
                                                                     visibility_rays = self._visibility_rays,
                                                                     obstacles_coordinates = self.config.environment.obstacles_coordinates)
+        # Set the progress coefficient based on whether a seeker is visible before the agent moves
+        progress_coefficient = 0.05 if visible_seekers_before_agent_move else 0.1
 
         # Move the agent in the environment
         # NOTE: The updated agent coordinates may not necessarily be valid
@@ -316,6 +318,7 @@ class ReactiveAvoidanceEnv(MiniGridEnv):
                                                                 truncated = truncated,
                                                                 previous_time_steps_to_goal = previous_time_steps_to_goal,
                                                                 current_time_steps_to_goal = current_time_steps_to_goal,
+                                                                progress_coefficient = progress_coefficient,
                                                                 current_agent_coordinates = self._current_agent_coordinates,
                                                                 currently_visible_seekers_coordinates = visible_seekers_after_agent_move,
                                                                 visibility_radius = self.config.agent.visibility_radius,
@@ -359,6 +362,7 @@ class ReactiveAvoidanceEnv(MiniGridEnv):
                                                                 truncated = truncated,
                                                                 previous_time_steps_to_goal = previous_time_steps_to_goal,
                                                                 current_time_steps_to_goal = current_time_steps_to_goal,
+                                                                progress_coefficient = progress_coefficient,
                                                                 current_agent_coordinates = self._current_agent_coordinates,
                                                                 currently_visible_seekers_coordinates = visible_seekers_after_agent_move,
                                                                 visibility_radius = self.config.agent.visibility_radius,
@@ -417,6 +421,7 @@ class ReactiveAvoidanceEnv(MiniGridEnv):
                                                                 truncated = truncated,
                                                                 previous_time_steps_to_goal = previous_time_steps_to_goal,
                                                                 current_time_steps_to_goal = current_time_steps_to_goal,
+                                                                progress_coefficient = progress_coefficient,
                                                                 current_agent_coordinates = self._current_agent_coordinates,
                                                                 currently_visible_seekers_coordinates = visible_seekers_after_seekers_move,
                                                                 visibility_radius = self.config.agent.visibility_radius,
@@ -438,6 +443,7 @@ class ReactiveAvoidanceEnv(MiniGridEnv):
                                                             truncated = truncated,
                                                             previous_time_steps_to_goal = previous_time_steps_to_goal,
                                                             current_time_steps_to_goal = current_time_steps_to_goal,
+                                                            progress_coefficient = progress_coefficient,
                                                             current_agent_coordinates = self._current_agent_coordinates,
                                                             currently_visible_seekers_coordinates = visible_seekers_after_seekers_move,
                                                             visibility_radius = self.config.agent.visibility_radius,

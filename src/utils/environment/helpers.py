@@ -546,7 +546,7 @@ def compute_danger_penalty(*,
                            currently_visible_seekers_coordinates: Iterable[Coordinates],
                            visibility_radius: int,
                            distance_metric: Callable[[Coordinates, Coordinates], int | float] = chebyshev_distance,
-                           danger_coefficient: float = 0.01) -> float:
+                           danger_coefficient: float = 0.05) -> float:
     """
     Computes the penalty term associated with the agent's danger level in the environment.
 
