@@ -1,0 +1,125 @@
+---
+layout: default
+title: Final Report
+---
+
+# Breaking Ankles with RL
+
+<iframe width="560" height="315" src="PUT THE YOUTUBE LINK HERE" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>
+
+## Project Summary
+
+Breaking Ankles with RL is a reinforcement-learning project studying reactive avoidance in a two-dimensional gridworld. In our problem setup, an agent with partial observability navigates from some starting location to some goal location while avoiding static obstacles and dynamic "seekers". Both the agent and the seekers traverse the gridworld at some constant velocity, and each seeker attempts to move in a manner that minimizes its Chebyshev distance to the agent. A single episode terminates when the agent reaches the objective, when a seeker intercepts the agent, when the agent collides with an obstacle or boundary, or when a time limit is reached. The training objective is to learn a policy that balances goal-oriented navigation with real-time evasive maneuvers. The overarching goal of our project is to develop a reinforcement learning framework that facilitates long-term autonomous navigation amidst short-term safety constraints.
+
+The environment is implemented in Python using Gymnasium and built on MiniGrid as a simulation environment, operating in discrete time steps. The agent receives an observation of its position, the relative position of the goal, and the relative positions of nearby obstacles and seekers stacked over the last five frames to provide temporal context. The agent has 9 actions, to move to any one of the adjacent spaces or to not move at all, and using Proximal Policy Optimization through Stable Baselines 3 over many training steps, we learn how to balance efficient goal-directed movement with seeker and obstacle avoidance. This is motivated by real-world applications in robotic exploration and autonomous navigation within dynamic environments, where an agent must operate under limited sensing and cannot afford to fail.
+
+What makes this problem non-trivial is the tension between two competing objectives: reaching the goal as quickly as possible and avoiding threats that actively pursue the agent. A purely greedy navigation strategy will walk the agent directly into a seeker, while an overly cautious policy will idle or timeout. The agent must also operate under partial observability, inferring seeker trajectories from a short history of local observations rather than having access to global state. These constraints make handcrafted heuristics insufficient and motivate the use of a learned policy via reinforcement learning.
+
+## Approach
+
+Our training-evaluation pipeline accepts as input YAML configuration files, each containing several environment hyperparameters that determine a particular environment configuration. In particular, these hyperparameters include the gridworld dimensions, the static obstacles' locations, the episode time limit, the agent's start and goal locations, the agent's velocity, the agent's visibility radius, the seekers' start locations, and the seekers' velocity. Given these configuration files, our pipeline produces a training environment, a validation environment, and two evaluation environments — one in-distribution and one out-of-distribution.
+
+We implement each environment in Python using Gymnasium, a popular open-source library for implementing reinforcement learning environments. We use MiniGrid, an extension of the Gymnasium ecosystem with configurable grid environments, to assist in rendering. Each environment operates in discrete time steps, and at each step the agent receives a flat observation vector and a scalar reward.
+
+### Algorithm
+
+The agent is trained using Proximal Policy Optimization (PPO) [Schulman et al., 2017], which is an on-policy actor-critic reinforcement learning algorithm. We use the implementation from Stable Baselines 3 with a `MultiInputPolicy` network, which automatically builds a neural network suited to the flat observation vector.
+
+PPO works by collecting a fresh batch of environment experience, running several gradient update passes over that batch, then discarding it and collecting new data. This keeps training stable because the policy being optimized never drifts too far from the policy that collected the data. Stability is further enforced by a clipping mechanism: the policy update is constrained so that the new policy's action probabilities cannot change by more than a factor of clip_range, which is 0.2 relative to the old policy. 
+
+The full loss PPO minimizes combines three terms:
+
+- **Clipped policy loss** — maximizes expected advantage while preventing large policy shifts.
+- **Value function loss** — trains a critic to predict future returns (mean-squared error).
+- **Entropy bonus** — encourages exploration by penalizing overconfident action distributions.
+
+Advantages (how much better an action was than expected) are estimated using Generalized Advantage Estimation (GAE) [Schulman et al., 2016] with discount factor γ = 0.99 and smoothing parameter λ = 0.95.
+
+### Environment
+
+The environment is a 10×10 MiniGrid gridworld in which the agent (the "runner") must navigate from a fixed start position to a goal while avoiding static wall obstacles and pursuing seekers. Each episode lasts at most n steps, to which we experiement with around 100.
+
+**Observation (State)**:  
+Each observation is a flat vector with three components:
+
+1. The agent's current (x, y) position, scaled to the range [−1, 1].
+2. The (dx, dy) vector pointing from the agent to the goal, also scaled to [−1, 1].
+3. A local observation stack: the last 5 frames of what the agent can see. Each frame covers a (2r+1) × (2r+1) tile window centered on the agent (experimented with visibility radius r ranging from 3-5) with 4 binary channels: one for occluded cells, one for boundary cells, one for walls/obstacles, and one for seekers. This gives the agent a short-term memory of recent seeker movements so it can infer their direction of travel.
+
+**Actions**:  
+The agent has 9 discrete actions: stay in place, or move in any of the 8 cardinal and diagonal directions. 
+Note: It is a deliberate design decision for both the agent and seekesr to "phase" through walls/corners, as long as the diagonal is open.
+
+**Rewards**:
+
+A significant development since the status report is a substantially richer reward structure. Rather than a simple sparse reward for reaching the goal or colliding, we now use a shaped reward composed of five terms computed at each time step:
+
+| Component | Description |
+| :--- | :--- |
+| Goal reward | +5 if agent reaches the goal |
+| Collision / interception / timeout penalty | −5 if agent collides, is intercepted, or the episode times out |
+| Progress reward | `progress_coefficient × (previous_ttg − current_ttg)`, where ttg is the BFS-precomputed time-to-goal from the current cell; `progress_coefficient = 0.05` if a seeker is visible, else `0.10` |
+| Danger penalty | `−danger_coefficient × (1 − distance_to_seeker / visibility_radius)` for each visible seeker |
+| Non-progress penalty | `−(base_penalty + nonprogress_coefficient × num_consecutive_nonprogress_steps)` when the agent repeatedly fails to make progress toward the goal without a visible seeker as justification |
+| Step penalty | −0.01 per step to discourage unnecessary idling |
+
+The progress reward is computed using a BFS-precomputed time-to-goal map (`_time_steps_to_goal_mapping`), which maps every reachable cell to the minimum number of steps required to reach the goal given the static obstacle layout. This map is precomputed once per configuration at initialization and is used purely for reward shaping — the agent's action selection is entirely learned and does not follow BFS. The `progress_coefficient` is reduced when a seeker is visible, relaxing the pressure to advance when the agent is actively evading a threat.
+
+**Seekers**:  
+Each seeker follows a greedy pursuit policy — every step it moves one cell in the direction that minimizes its Chebyshev distance to the agent. Two seekers start at opposite corners of the grid, but can be modified to increase the number of seekers or change positions.
+
+### Hyperparameters
+
+All PPO hyperparameters are left at their Stable Baselines 3 defaults [Raffin et al., 2021]. No tuning was performed.
+
+| Hyperparameter | Value | Source |
+| :--- | :--- | :--- |
+| Total training steps | 1,000,000 | Set by us |
+| Rollout buffer size (n_steps) | 2,048 | SB3 default |
+| Mini-batch size | 64 | SB3 default |
+| Update epochs per rollout | 10 | SB3 default |
+| Discount factor (γ) | 0.99 | SB3 default |
+| GAE lambda (λ) | 0.95 | SB3 default |
+| Clip range (ε) | 0.2 | SB3 default |
+| Learning rate | 0.0003 | SB3 default |
+| Entropy coefficient | 0.0 | SB3 default |
+| Value function coefficient | 0.5 | SB3 default |
+| Grid size | 10×10 | config/default.yaml |
+| Visibility radius | 5 | config/default.yaml |
+| Observation stack depth | 5 frames | config/default.yaml |
+| Episode time limit | 80 steps | config/default.yaml |
+| Number of seekers | 1–2 | config/default.yaml |
+
+## Evaluation
+
+Our primary evaluation metrics are success rate (percentage of episodes where the agent reaches the goal), interception rate (percentage of episodes where a seeker intercepts the agent), collision rate (percentage of episodes where the agent collides with an obstacle or boundary), and timeout rate (percentage of episodes that exhaust the step limit).
+
+**Quantitative Results**:  
+After training for 1,000,000 steps, the agent achieves an **89% goal rate** and a **0% timeout rate** on the training environment. The 0% timeout rate is particularly notable — the agent always attempts to make progress and never idles indefinitely. Interception rate decreases steadily over the course of training as the agent learns to anticipate and evade seeker trajectories.
+
+**Training Curves**:  
+
+<!-- PUT THE PLOTS HERE -->
+
+The TensorBoard training curves reveal several phases of learning. The collision rate fluctuates early in training as the agent explores different paths through the obstacle layout, then stabilizes as it converges on consistent routes. The interception rate decreases over time, reflecting the agent's growing competence at reactive avoidance. Episode reward increases monotonically and stabilizes, and episode length remains well below the step limit throughout training, consistent with the 0% timeout rate.
+
+**Qualitative Results**:  
+Qualitatively, the agent demonstrates clear reactive avoidance behavior. When a seeker enters its observation window, the agent visibly deviates from the direct path to the goal, taking an indirect route that maintains distance from the threat before resuming goal-directed movement. The agent also shows high path efficiency — it does not wander or backtrack unnecessarily, and consistently reaches the goal in near-optimal step counts given the presence of seekers.
+
+## Future Work
+The current implementation establishes a strong foundation for reactive avoidance in a fixed discrete environment, but several natural extensions would meaningfully increase the generality and realism of the framework.
+
+The most immediate next step is training on procedurally generated environments. The current policy is trained on a single fixed configuration, which means the BFS time-to-goal map and the obstacle layout are constant across all training episodes. Moving to batch-generated environments with varied obstacle placements, seeker starting positions, and grid layouts would force the agent to learn a more general avoidance policy rather than one that is specialized to a particular map. This is the clearest path toward a policy that transfers to new environements during testing.
+
+Another progression step is to introduce more realistic agent dynamics. The current model assumes constant velocity and unconstrained movement in all directions. Incorporating acceleration, inertia, and orientation-based observability, where the agent can only see in the direction it is facing, would meaningfully increase the difficulty of the evasion problem. Extending the framework from discrete to continuous action and state spaces, and from two dimensions to three using a physics simulator such as PyBullet would also help to align the project with more realistic use cases. 
+
+Finally, replacing the greedy seeker policy with a learned RL seeker agent would introduce a genuine adversarial dynamic, requiring the agent to develop avoidance behavior that generalizes beyond a fixed pursuit pattern.
+
+## Resources Used
+
+- We used AI tools to explore possible RL algorithms, to assist in debugging the training pipeline, and to perform grammar checking and formatting additions for visual aesthetics on reports. 
+
+## References
+* Schulman et al. (2017). Proximal Policy Optimization Algorithms. arXiv:1707.06347.  
+* Schulman et al. (2016). High-Dimensional Continuous Control Using Generalized Advantage Estimation. arXiv:1506.02438.  
+* Raffin et al. (2021). Stable-Baselines3. JMLR. https://stable-baselines3.readthedocs.io  
