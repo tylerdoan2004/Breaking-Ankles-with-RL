@@ -1,6 +1,7 @@
 #!/bin/bash
 #SBATCH --job-name=reactive_avoidance
-#SBATCH --partition=gpu           # Change to your cluster's GPU partition name
+#SBATCH --account=cs175_class_gpu
+#SBATCH --partition=gpu           # Change if needed (check: sinfo -s)
 #SBATCH --gres=gpu:1              # Request 1 GPU
 #SBATCH --cpus-per-task=8         # 8 CPUs for parallel envs
 #SBATCH --mem=16G                 # 16GB RAM
@@ -8,9 +9,8 @@
 #SBATCH --output=slurm_%j.out     # Output log (%j = job ID)
 #SBATCH --error=slurm_%j.err      # Error log
 
-# ── Load modules (adjust to your cluster) ──
-# module load python/3.12
-# module load cuda/12.1
+# ── Load modules ──
+module load python/3.10.2
 
 # ── Activate your virtual environment ──
 # Option A: conda
