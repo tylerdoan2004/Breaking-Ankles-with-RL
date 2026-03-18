@@ -171,10 +171,12 @@ def compute_distance_to_hazards(*,
     :param seekers_coordinates: The coordinates of the seekers.
     :return: A dictionary containing the agent's distance to each type of hazard.
     """
+    obstacles_list = list(obstacles_coordinates)
+    seekers_list = list(seekers_coordinates)
     return {
-        "obstacle": min(distance_metric(current_agent_coordinates, obstacle_coordinates) for obstacle_coordinates in obstacles_coordinates),
+        "obstacle": min((distance_metric(current_agent_coordinates, oc) for oc in obstacles_list), default=float('inf')),
         "boundary": min(current_agent_coordinates.x + 1, grid_dimensions.width - current_agent_coordinates.x, current_agent_coordinates.y + 1, grid_dimensions.height - current_agent_coordinates.y),
-        "seeker": min(distance_metric(current_agent_coordinates, seeker_coordinates) for seeker_coordinates in seekers_coordinates),
+        "seeker": min((distance_metric(current_agent_coordinates, sc) for sc in seekers_list), default=float('inf')),
     }
 
 

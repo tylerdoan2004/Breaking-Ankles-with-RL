@@ -24,6 +24,7 @@ from src.utils.environment.helpers import (
     move_seeker,
     MOVEMENT_VECTORS
 )
+from src.utils.environment.randomization import generate_randomized_layout
 from src.utils.environment.seeker import Seeker
 from src.utils.environment.vector import Vector
 from src.utils.logging.helpers import (
@@ -31,7 +32,7 @@ from src.utils.logging.helpers import (
     compute_episode_metrics,
     compute_minimum_distance_to_hazards
 )
-from src.utils.yaml_parser.configuration import SystemConfiguration
+from src.utils.yaml_parser.configuration import SeekerConfiguration, SystemConfiguration
 
 
 class ReactiveAvoidanceEnv(MiniGridEnv):
@@ -55,20 +56,28 @@ class ReactiveAvoidanceEnv(MiniGridEnv):
             render_mode = render_mode
         )
         self.config = config
+        self._randomization = config.randomization
+
+        # Runtime state: these track the current episode's layout (may differ from config when randomized)
+        self._runtime_obstacles: set[Coordinates] = set(config.environment.obstacles_coordinates)
+        self._runtime_agent_start: Coordinates = config.agent.start_coordinates
+        self._runtime_goal: Coordinates = config.agent.goal_coordinates
+        self._runtime_seekers: list[SeekerConfiguration] = list(config.seekers)
+
         # Compute caches
         self._visibility_rays = compute_offset_to_line_mapping(config.agent.visibility_radius)
         self._time_steps_to_goal_mapping = compute_time_steps_to_goal_mapping(
-            goal_coordinates = config.agent.goal_coordinates,
+            goal_coordinates = self._runtime_goal,
             grid_dimensions = config.environment.grid_dimensions,
-            obstacles_coordinates = config.environment.obstacles_coordinates,
+            obstacles_coordinates = self._runtime_obstacles,
             agent_velocity = config.agent.velocity
         )
-        self._starting_time_steps_to_goal = self._time_steps_to_goal_mapping.get(config.agent.start_coordinates)
+        self._starting_time_steps_to_goal = self._time_steps_to_goal_mapping.get(self._runtime_agent_start)
 
         # Initialize the internal dynamic components of the environment state
         self._current_step = 0
-        self._current_agent_coordinates = config.agent.start_coordinates
-        self._current_seekers_coordinates = [seeker.start_coordinates for seeker in config.seekers]
+        self._current_agent_coordinates = self._runtime_agent_start
+        self._current_seekers_coordinates = [seeker.start_coordinates for seeker in self._runtime_seekers]
         current_local_observation = self._compute_local_observation()
         self._current_local_observation_history: deque[np.ndarray] = deque(maxlen = config.agent.observation_stack_depth)
         for _ in range(config.agent.observation_stack_depth):
@@ -82,11 +91,60 @@ class ReactiveAvoidanceEnv(MiniGridEnv):
 
         # Compute metrics
         self._minimum_distance_to_hazards: dict[Literal["obstacle", "boundary", "seeker"], int | float] = compute_distance_to_hazards(
-            current_agent_coordinates = config.agent.start_coordinates,
-            obstacles_coordinates = config.environment.obstacles_coordinates,
+            current_agent_coordinates = self._runtime_agent_start,
+            obstacles_coordinates = self._runtime_obstacles,
             grid_dimensions = config.environment.grid_dimensions,
             seekers_coordinates = self._current_seekers_coordinates
         )
+
+    def _randomize_layout(self) -> None:
+        """
+        Generates a new randomized layout for the environment. Updates runtime state variables.
+        Called during reset() when randomization is enabled.
+        
+        :return: None.
+        """
+        if self._randomization is None or not self._randomization.is_enabled:
+            return
+
+        rng = self.np_random
+
+        layout = generate_randomized_layout(
+            rng = rng,
+            grid_dimensions = self.config.environment.grid_dimensions,
+            num_obstacles_range = self._randomization.num_obstacles_range,
+            num_seekers_range = self._randomization.num_seekers_range,
+            seeker_policies = self._randomization.seeker_policies,
+            min_start_goal_distance = self._randomization.min_start_goal_distance
+        )
+
+        if layout is None:
+            # Fallback: use the default config layout if randomization fails
+            return
+
+        if self._randomization.randomize_obstacles:
+            self._runtime_obstacles = layout["obstacles"]
+
+        if self._randomization.randomize_positions:
+            self._runtime_agent_start = layout["agent_start"]
+            self._runtime_goal = layout["goal"]
+            self._runtime_seekers = [
+                SeekerConfiguration(
+                    start_coordinates = s["start_coordinates"],
+                    velocity = s["velocity"],
+                    policy = s["policy"]
+                )
+                for s in layout["seekers"]
+            ]
+
+        # Recompute the BFS cache with the new layout
+        self._time_steps_to_goal_mapping = compute_time_steps_to_goal_mapping(
+            goal_coordinates = self._runtime_goal,
+            grid_dimensions = self.config.environment.grid_dimensions,
+            obstacles_coordinates = self._runtime_obstacles,
+            agent_velocity = self.config.agent.velocity
+        )
+        self._starting_time_steps_to_goal = self._time_steps_to_goal_mapping.get(self._runtime_agent_start)
 
     def _compute_local_observation(self) -> np.ndarray:
         """
@@ -105,14 +163,14 @@ class ReactiveAvoidanceEnv(MiniGridEnv):
                 current_visibility_offset = Vector(dx, dy)
                 current_agent_offset = Vector(self._current_agent_coordinates.x, self._current_agent_coordinates.y)
                 current_visibility_ray = [coordinates + current_agent_offset for coordinates in self._visibility_rays[current_visibility_offset]]
-                if not can_see(current_visibility_ray, self.config.environment.obstacles_coordinates):
+                if not can_see(current_visibility_ray, self._runtime_obstacles):
                     local_observation[0, dx + visibility_radius, dy + visibility_radius] = 1.0
                     continue
                 current_cell_coordinates = self._current_agent_coordinates + current_visibility_offset
                 if not self.config.environment.grid_dimensions.contains_coordinates(current_cell_coordinates):
                     local_observation[1, dx + visibility_radius, dy + visibility_radius] = 1.0
                     continue
-                if current_cell_coordinates in self.config.environment.obstacles_coordinates:
+                if current_cell_coordinates in self._runtime_obstacles:
                     local_observation[2, dx + visibility_radius, dy + visibility_radius] = 1.0
                 if current_cell_coordinates in seekers_coordinates:
                     local_observation[3, dx + visibility_radius, dy + visibility_radius] = 1.0
@@ -126,7 +184,7 @@ class ReactiveAvoidanceEnv(MiniGridEnv):
         """
         scaled_current_agent_coordinates = scale_absolute_coordinates(self._current_agent_coordinates,
                                                                       self.config.environment.grid_dimensions.width, self.config.environment.grid_dimensions.height)
-        scaled_relative_goal_vector = scale_relative_vector(self.config.agent.goal_coordinates - self._current_agent_coordinates,
+        scaled_relative_goal_vector = scale_relative_vector(self._runtime_goal - self._current_agent_coordinates,
                                                             self.config.environment.grid_dimensions.width, self.config.environment.grid_dimensions.height)
         observation_stack = np.concatenate(self._current_local_observation_history, dtype = np.float32)
         return np.concatenate((scaled_current_agent_coordinates, scaled_relative_goal_vector, observation_stack), dtype = np.float32)
@@ -150,16 +208,24 @@ class ReactiveAvoidanceEnv(MiniGridEnv):
 
     def reset(self, *, seed: Optional[int] = None, options: Optional[dict] = None) -> tuple[np.ndarray, dict[str, Any]]:
         """
-        Resets the environment to its initial state.
+        Resets the environment to its initial state. When randomization is enabled,
+        generates a new layout with random obstacles, positions, and seekers.
         
         :param seed: The seed for the environment's random number generator.
         :param options: A dictionary of options specifying how to reset the environment.
         """
         # Calls self._gen_grid() internally to set up the grid for the reactive avoidance environment
         super().reset(seed = seed, options = options)
+
+        # Randomize layout if configured (must be called after super().reset() sets self.np_random)
+        self._randomize_layout()
+
+        # Re-generate the grid with the (possibly new) layout
+        self._gen_grid(self.config.environment.grid_dimensions.width, self.config.environment.grid_dimensions.height)
+
         self._current_step = 0
-        self._current_agent_coordinates = self.config.agent.start_coordinates
-        self._current_seekers_coordinates = [seeker.start_coordinates for seeker in self.config.seekers]
+        self._current_agent_coordinates = self._runtime_agent_start
+        self._current_seekers_coordinates = [seeker.start_coordinates for seeker in self._runtime_seekers]
         current_local_observation = self._compute_local_observation()
         self._current_local_observation_history = deque(maxlen = self.config.agent.observation_stack_depth)
         for _ in range(self.config.agent.observation_stack_depth):
@@ -167,7 +233,7 @@ class ReactiveAvoidanceEnv(MiniGridEnv):
         self._num_consecutive_penalizable_nonprogress_steps = 0
         self._minimum_distance_to_hazards = compute_distance_to_hazards(
             current_agent_coordinates = self._current_agent_coordinates,
-            obstacles_coordinates = self.config.environment.obstacles_coordinates,
+            obstacles_coordinates = self._runtime_obstacles,
             grid_dimensions = self.config.environment.grid_dimensions,
             seekers_coordinates = self._current_seekers_coordinates
         )
@@ -185,20 +251,20 @@ class ReactiveAvoidanceEnv(MiniGridEnv):
         self.grid = Grid(width, height)
 
         # Place agent on the grid
-        self.agent_pos = (self.config.agent.start_coordinates.x, self.config.agent.start_coordinates.y)
+        self.agent_pos = (self._runtime_agent_start.x, self._runtime_agent_start.y)
         # Set the agent's direction in the grid 
         # NOTE: Required for the MiniGridEnv class
         self.agent_dir = 0
 
         # Place goal on the grid
-        self.grid.set(self.config.agent.goal_coordinates.x, self.config.agent.goal_coordinates.y, Goal())
+        self.grid.set(self._runtime_goal.x, self._runtime_goal.y, Goal())
     
         # Place seekers on the grid
-        for seeker in self.config.seekers:
+        for seeker in self._runtime_seekers:
             self.grid.set(seeker.start_coordinates.x, seeker.start_coordinates.y, Seeker())
         
         # Place obstacles on the grid
-        for obstacle in self.config.environment.obstacles_coordinates:
+        for obstacle in self._runtime_obstacles:
             self.grid.set(obstacle.x, obstacle.y, Wall())
 
     def _finalize_step(self, *, reward: float, terminated: bool, truncated: bool,
@@ -259,7 +325,7 @@ class ReactiveAvoidanceEnv(MiniGridEnv):
                                                                     current_seekers_coordinates = self._current_seekers_coordinates,
                                                                     visibility_radius = self.config.agent.visibility_radius,
                                                                     visibility_rays = self._visibility_rays,
-                                                                    obstacles_coordinates = self.config.environment.obstacles_coordinates)
+                                                                    obstacles_coordinates = self._runtime_obstacles)
         # Set the progress coefficient based on whether a seeker is visible before the agent moves
         progress_coefficient = 0.05 if visible_seekers_before_agent_move else 0.1
 
@@ -269,9 +335,9 @@ class ReactiveAvoidanceEnv(MiniGridEnv):
                                                                                              velocity = self.config.agent.velocity,
                                                                                              movement_vector = movement_vector,
                                                                                              grid_dimensions = self.config.environment.grid_dimensions,
-                                                                                             obstacles_coordinates = self.config.environment.obstacles_coordinates,
+                                                                                             obstacles_coordinates = self._runtime_obstacles,
                                                                                              seekers_coordinates = frozenset(self._current_seekers_coordinates),
-                                                                                             goal_coordinates = self.config.agent.goal_coordinates)
+                                                                                             goal_coordinates = self._runtime_goal)
         # Update the agent's position in the grid
         # NOTE: The updated agent coordinates in the grid may not necessarily be valid
         self.agent_pos = (updated_agent_coordinates.x, updated_agent_coordinates.y)
@@ -279,7 +345,7 @@ class ReactiveAvoidanceEnv(MiniGridEnv):
         # Compute minimum distance to hazards after moving
         # NOTE: The updated agent coordinates used to compute the minimum distance to hazards may not necessarily be valid
         current_distance_to_hazards = compute_distance_to_hazards(current_agent_coordinates = updated_agent_coordinates,
-                                                                  obstacles_coordinates = self.config.environment.obstacles_coordinates,
+                                                                  obstacles_coordinates = self._runtime_obstacles,
                                                                   grid_dimensions = self.config.environment.grid_dimensions,
                                                                   seekers_coordinates = self._current_seekers_coordinates)
         self._minimum_distance_to_hazards = compute_minimum_distance_to_hazards(current_minimum_distance_to_hazards = self._minimum_distance_to_hazards,
@@ -289,7 +355,7 @@ class ReactiveAvoidanceEnv(MiniGridEnv):
         # If moving the agent results in a collision, return the current observation and terminate the episode
         if collided:
             collision_type: Optional[Literal["obstacle", "boundary", "seeker"]] = None
-            if updated_agent_coordinates in self.config.environment.obstacles_coordinates:
+            if updated_agent_coordinates in self._runtime_obstacles:
                 collision_type = "obstacle"
             elif not self.config.environment.grid_dimensions.contains_coordinates(updated_agent_coordinates):
                 collision_type = "boundary"
@@ -302,7 +368,7 @@ class ReactiveAvoidanceEnv(MiniGridEnv):
                                                                        current_seekers_coordinates = self._current_seekers_coordinates,
                                                                        visibility_radius = self.config.agent.visibility_radius,
                                                                        visibility_rays = self._visibility_rays,
-                                                                       obstacles_coordinates = self.config.environment.obstacles_coordinates)
+                                                                       obstacles_coordinates = self._runtime_obstacles)
             # Compute time steps to goal after moving
             current_time_steps_to_goal = self._time_steps_to_goal_mapping.get(last_valid_agent_coordinates)
             # Compute whether to penalize potential nonprogress
@@ -341,7 +407,7 @@ class ReactiveAvoidanceEnv(MiniGridEnv):
                                                                    current_seekers_coordinates = self._current_seekers_coordinates,
                                                                    visibility_radius = self.config.agent.visibility_radius,
                                                                    visibility_rays = self._visibility_rays,
-                                                                   obstacles_coordinates = self.config.environment.obstacles_coordinates)
+                                                                   obstacles_coordinates = self._runtime_obstacles)
 
         # Compute time steps to goal after moving
         current_time_steps_to_goal = self._time_steps_to_goal_mapping.get(self._current_agent_coordinates)
@@ -381,7 +447,7 @@ class ReactiveAvoidanceEnv(MiniGridEnv):
         for coordinates in self._current_seekers_coordinates:
             self.grid.set(coordinates.x, coordinates.y, None)
         # Move the seekers in the environment
-        for i, seeker in enumerate(self.config.seekers):
+        for i, seeker in enumerate(self._runtime_seekers):
             other_seekers_coordinates = frozenset(self._current_seekers_coordinates[:i] + self._current_seekers_coordinates[i+1:])
             # TODO: Implement other policies
             self._current_seekers_coordinates[i] = move_seeker(current_coordinates = self._current_seekers_coordinates[i],
@@ -389,9 +455,9 @@ class ReactiveAvoidanceEnv(MiniGridEnv):
                                                                policy = seeker.policy,
                                                                current_agent_coordinates = self._current_agent_coordinates,
                                                                grid_dimensions = self.config.environment.grid_dimensions,
-                                                               obstacles_coordinates = self.config.environment.obstacles_coordinates,
+                                                               obstacles_coordinates = self._runtime_obstacles,
                                                                other_seekers_coordinates = other_seekers_coordinates,
-                                                               goal_coordinates = self.config.agent.goal_coordinates)
+                                                               goal_coordinates = self._runtime_goal)
         # Update the seekers' positions in the grid
         for coordinates in self._current_seekers_coordinates:
             self.grid.set(coordinates.x, coordinates.y, Seeker())
@@ -401,11 +467,11 @@ class ReactiveAvoidanceEnv(MiniGridEnv):
                                                                      current_seekers_coordinates = self._current_seekers_coordinates,
                                                                      visibility_radius = self.config.agent.visibility_radius,
                                                                      visibility_rays = self._visibility_rays,
-                                                                     obstacles_coordinates = self.config.environment.obstacles_coordinates)
+                                                                     obstacles_coordinates = self._runtime_obstacles)
 
         # Compute minimum distance to hazards after moving the seekers
         current_distance_to_hazards = compute_distance_to_hazards(current_agent_coordinates = self._current_agent_coordinates,
-                                                                  obstacles_coordinates = self.config.environment.obstacles_coordinates,
+                                                                  obstacles_coordinates = self._runtime_obstacles,
                                                                   grid_dimensions = self.config.environment.grid_dimensions,
                                                                   seekers_coordinates = self._current_seekers_coordinates)
         self._minimum_distance_to_hazards = compute_minimum_distance_to_hazards(current_minimum_distance_to_hazards = self._minimum_distance_to_hazards,
@@ -414,7 +480,7 @@ class ReactiveAvoidanceEnv(MiniGridEnv):
         # If moving the seekers results in an interception, return the current observation and terminate the episode
         if self._current_agent_coordinates in self._current_seekers_coordinates:
             # Get the interceptor's policy
-            interceptor_policy = self.config.seekers[self._current_seekers_coordinates.index(self._current_agent_coordinates)].policy
+            interceptor_policy = self._runtime_seekers[self._current_seekers_coordinates.index(self._current_agent_coordinates)].policy
             return self._finalize_step(reward = compute_rewards(goal = goal,
                                                                 collided = collided,
                                                                 intercepted = True,

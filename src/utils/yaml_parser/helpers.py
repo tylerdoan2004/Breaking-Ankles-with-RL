@@ -77,7 +77,7 @@ def is_system_config_shallowly_valid(data: Any) -> bool:
     """
     if not isinstance(data, dict):
         return False
-    if set(data.keys()) != {"version", "agent", "seekers", "environment"}:
+    if set(data.keys()) not in ({"version", "agent", "seekers", "environment"}, {"version", "agent", "seekers", "environment", "randomization"}):
         return False
     if not is_config_version_valid(data["version"]):
         return False

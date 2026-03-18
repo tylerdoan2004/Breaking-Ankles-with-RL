@@ -1,9 +1,9 @@
 """
-This module provides the SystemConfiguration, AgentConfiguration, SeekerConfiguration, and EnvironmentConfiguration classes for representing system, agent, seeker, and environment configurations.
+This module provides the SystemConfiguration, AgentConfiguration, SeekerConfiguration, EnvironmentConfiguration, and RandomizationConfig classes for representing system, agent, seeker, environment, and randomization configurations.
 """
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Literal
+from typing import Literal, Optional
 from src.utils.yaml_parser.helpers import (
     is_agent_config_shallowly_valid,
     is_coordinates_data_valid,
@@ -20,7 +20,45 @@ from src.utils.environment.coordinates import Coordinates
 from src.utils.environment.grid_dimensions import GridDimensions
 
 
-__all__ = ["SystemConfiguration", "AgentConfiguration", "SeekerConfiguration", "EnvironmentConfiguration"]
+__all__ = ["SystemConfiguration", "AgentConfiguration", "SeekerConfiguration", "EnvironmentConfiguration", "RandomizationConfig"]
+
+
+@dataclass(frozen = True, kw_only = True)
+class RandomizationConfig:
+    """
+    A class for representing the randomization configuration for the reactive avoidance environment.
+    When enabled, the environment randomizes positions and/or obstacles on each reset.
+    """
+    randomize_positions: bool = False
+    randomize_obstacles: bool = False
+    num_obstacles_range: tuple[int, int] = (80, 120)
+    num_seekers_range: tuple[int, int] = (2, 4)
+    seeker_policies: list[str] = field(default_factory = lambda: ["greedy"])
+    min_start_goal_distance: int = 15
+
+    @property
+    def is_enabled(self) -> bool:
+        """
+        Returns True if any randomization is enabled.
+        """
+        return self.randomize_positions or self.randomize_obstacles
+
+    @staticmethod
+    def from_dict(randomization_config: dict) -> "RandomizationConfig":
+        """
+        Creates a RandomizationConfig object from a dictionary.
+        
+        :param randomization_config: A dictionary representing a randomization configuration.
+        :return: A RandomizationConfig object.
+        """
+        return RandomizationConfig(
+            randomize_positions = randomization_config.get("randomize_positions", False),
+            randomize_obstacles = randomization_config.get("randomize_obstacles", False),
+            num_obstacles_range = tuple(randomization_config.get("num_obstacles_range", [80, 120])),
+            num_seekers_range = tuple(randomization_config.get("num_seekers_range", [2, 4])),
+            seeker_policies = randomization_config.get("seeker_policies", ["greedy"]),
+            min_start_goal_distance = randomization_config.get("min_start_goal_distance", 15)
+        )
 
 
 @dataclass(frozen = True, kw_only = True)
@@ -123,6 +161,7 @@ class SystemConfiguration:
     seekers: list[SeekerConfiguration]
     environment: EnvironmentConfiguration
     num_seekers: int
+    randomization: Optional[RandomizationConfig] = None
 
     @staticmethod
     def from_dict(system_config: dict) -> "SystemConfiguration":
@@ -141,13 +180,22 @@ class SystemConfiguration:
         if not is_environment_config_shallowly_valid(system_config["environment"]):
             raise ValueError(f"The system configuration does not have a valid environment configuration: {system_config}")
 
+        # Parse optional randomization config
+        randomization = None
+        if "randomization" in system_config:
+            randomization = RandomizationConfig.from_dict(system_config["randomization"])
+
         system_configuration = SystemConfiguration(
             agent = AgentConfiguration.from_dict(system_config["agent"]),
             seekers = [SeekerConfiguration.from_dict(seeker_config) for seeker_config in system_config["seekers"]],
             environment = EnvironmentConfiguration.from_dict(system_config["environment"]),
-            num_seekers = len(system_config["seekers"])
+            num_seekers = len(system_config["seekers"]),
+            randomization = randomization
         )
-        validate_system_configuration(system_configuration)
+
+        # Skip fixed-position validation when randomization is enabled
+        if randomization is None or not randomization.is_enabled:
+            validate_system_configuration(system_configuration)
 
         return system_configuration
 

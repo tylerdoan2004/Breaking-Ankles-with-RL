@@ -8,6 +8,10 @@ torch
 # RL algorithm dependencies
 stable_baselines3
 
+# Multi-agent RL dependencies
+pettingzoo
+supersuit
+
 # Training dependencies
 tqdm
 rich

@@ -1,0 +1,28 @@
+version: 1
+
+environment:
+  grid_dimensions:
+    width: 30
+    height: 30
+  obstacles_coordinates: []
+  episode_time_limit: 150
+
+agent:
+  start_coordinates: [0, 0]
+  goal_coordinates: [29, 29]
+  velocity: 1
+  visibility_radius: 3
+  observation_stack_depth: 5
+
+seekers:
+  - start_coordinates: [15, 15]
+    velocity: 1
+    policy: "greedy"
+
+randomization:
+  randomize_positions: true
+  randomize_obstacles: true
+  num_obstacles_range: [60, 100]
+  num_seekers_range: [2, 4]
+  seeker_policies: ["greedy", "a-star"]
+  min_start_goal_distance: 15

@@ -1,7 +1,7 @@
 """
-A configuration file for a PPO experiment.
+A configuration file for multi-agent reactive avoidance experiments.
+Uses 2 cooperative runners with randomized environments.
 """
-from typing import Callable
 from src.utils.logging.experiment_metadata import (
     EvaluationMetadata,
     LoggingDirectoriesMetadata,
@@ -13,34 +13,15 @@ from src.utils.logging.experiment_metadata import (
 )
 
 
-def linear_scheduler_factory(initial_value: float, final_value: float) -> Callable[[float], float]:
-    """
-    Factory function for a linear scheduler.
-    
-    :param initial_value: The initial value of the scheduler.
-    :param final_value: The final value of the scheduler.
-    :return: A linear scheduler that linearly interpolates between the initial and final values.
-    """
-    def linear_scheduler(progress_remaining: float) -> float:
-        """
-        Linear scheduler that linearly interpolates between the initial and final values.
-        
-        :param progress_remaining: The remaining progress of the experiment. Should be between 0.0 and 1.0.
-        :return: The interpolated value between the initial and final values.
-        """
-        return final_value + (initial_value - final_value) * progress_remaining
-    return linear_scheduler
-
-
 LOGGING_DIRECTORY = "logs"
-EXPERIMENT_NAME = "reactive_avoidance"
+EXPERIMENT_NAME = "multi_agent_reactive_avoidance"
 SEED = 0
+NUM_RUNNERS = 2
 MODEL = ModelMetadata(
     name = "ppo",
-    # NOTE: Default model hyperparameters obtained from https://stable-baselines3.readthedocs.io/en/master/modules/ppo.html
     hyperparameters = {
         "policy": "MlpPolicy",
-        "learning_rate": linear_scheduler_factory(0.0003, 0.0001),
+        "learning_rate": 0.0003,
         "n_steps": 2048,
         "batch_size": 64,
         "n_epochs": 10,
@@ -49,7 +30,6 @@ MODEL = ModelMetadata(
         "clip_range": 0.2,
         "clip_range_vf": None,
         "normalize_advantage": True,
-        # NOTE: Adjusted from 0.0 to 0.01 to encourage exploration in randomized environments
         "ent_coef": 0.01,
         "vf_coef": 0.5,
         "max_grad_norm": 0.5,
@@ -78,20 +58,20 @@ SYSTEM_CONFIGURATIONS = SystemConfigurationsMetadata(
     )
 )
 TRAINING_METADATA = TrainingMetadata(
-    n_envs = 8,
-    # NOTE: To guarantee expected logging behavior, set total timesteps to a multiple of MODEL.hyperparameters.n_steps * n_envs
-    total_timesteps = 3_014_656
+    n_envs = 4,
+    # Multi-agent needs more steps: 5M total
+    total_timesteps = 5_013_504
 )
 LOGGING_METADATA = LoggingMetadata(
     logging_directories = LoggingDirectoriesMetadata(
         base = LOGGING_DIRECTORY,
         tensorboard = "training/metrics/tensorboard"
     ),
-    verbose = 0,
-    rolling_window_size = 200,
-    num_checkpoints = 16,
-    num_validation_evaluations = 16,
-    episodes_per_validation_evaluation = 25,
-    episodes_per_evaluation = 25,
-    num_videos = 16
+    verbose = 1,
+    rolling_window_size = 100,
+    num_checkpoints = 10,
+    num_validation_evaluations = 10,
+    episodes_per_validation_evaluation = 5,
+    episodes_per_evaluation = 10,
+    num_videos = 5
 )
