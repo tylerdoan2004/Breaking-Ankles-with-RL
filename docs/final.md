@@ -127,9 +127,24 @@ Finally, replacing the greedy seeker policy with a learned RL seeker agent would
 
 ## Resources Used
 
-- We used AI tools to explore possible RL algorithms, to assist in debugging the training pipeline, and to perform grammar checking and formatting additions for visual aesthetics on reports. 
+### Papers
+- Schulman et al. (2017). *Proximal Policy Optimization Algorithms.* [arXiv:1707.06347](https://arxiv.org/abs/1707.06347)
+- Schulman et al. (2016). *High-Dimensional Continuous Control Using Generalized Advantage Estimation.* [arXiv:1506.02438](https://arxiv.org/abs/1506.02438)
+- Raffin et al. (2021). *Stable-Baselines3.* JMLR. [stable-baselines3.readthedocs.io](https://stable-baselines3.readthedocs.io)
 
-## References
-* Schulman et al. (2017). Proximal Policy Optimization Algorithms. arXiv:1707.06347.  
-* Schulman et al. (2016). High-Dimensional Continuous Control Using Generalized Advantage Estimation. arXiv:1506.02438.  
-* Raffin et al. (2021). Stable-Baselines3. JMLR. https://stable-baselines3.readthedocs.io  
+### Libraries
+| Library | Purpose |
+|---|---|
+| `tensorboard` | Training metrics visualization (reward curves, loss, entropy) |
+| `moviepy` | Testing video recording during training |
+| `stable_baselines3` | PPO implementation, training loop, model checkpointing, and evaluation |
+| `gymnasium/minigrid` | Grid rendering, tile-based visualization, and base environment class |
+| `torch` | Neural network backend for PPO policy and value networks |
+
+### Documentation & References
+- [Stable-Baselines3](https://stable-baselines3.readthedocs.io) — PPO hyperparameter tuning, callback setup, vectorized environments
+- [Gymnasium](https://gymnasium.farama.org) — Custom environment creation, observation/action space design
+- [MiniGrid](https://minigrid.farama.org) — Grid rendering and custom world objects
+
+### AI Usage
+AI was utilized as a tool to explore initial ideas — such as identifying candidate algorithms, tuning parameters, and scoping implementation options. It also served as a coding assistant for debugging and generating small code snippets. Additionally, it was used as a grammar checker for the report. 
