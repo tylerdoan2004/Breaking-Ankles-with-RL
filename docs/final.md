@@ -133,13 +133,12 @@ Finally, replacing the greedy seeker policy with a learned RL seeker agent would
 - Raffin et al. (2021). *Stable-Baselines3.* JMLR. [stable-baselines3.readthedocs.io](https://stable-baselines3.readthedocs.io)
 
 ### Libraries
-| Library | Purpose |
-|---|---|
-| `tensorboard` | Training metrics visualization (reward curves, loss, entropy) |
-| `moviepy` | Testing video recording during training |
-| `stable_baselines3` | PPO implementation, training loop, model checkpointing, and evaluation |
-| `gymnasium/minigrid` | Grid rendering, tile-based visualization, and base environment class |
-| `torch` | Neural network backend for PPO policy and value networks |
+
+- **`tensorboard`** — Training metrics visualization (reward curves, loss, entropy)
+- **`moviepy`** — Testing video recording during training
+- **`stable_baselines3`** — PPO implementation, training loop, model checkpointing, and evaluation
+- **`gymnasium/minigrid`** — Grid rendering, tile-based visualization, and base environment class
+- **`torch`** — Neural network backend for PPO policy and value networks
 
 ### Documentation & References
 - [Stable-Baselines3](https://stable-baselines3.readthedocs.io) — PPO hyperparameter tuning, callback setup, vectorized environments
