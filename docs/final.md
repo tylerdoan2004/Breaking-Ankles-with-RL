@@ -104,7 +104,7 @@ $\mathbf{R_{nonprogress}(t)}$**: the non-progress penalty term**
 
 The non-progress penalty term penalizes the agent for not making progress towards the goal location when safe. Specifically, the term evaluates to:
 - $0$ if $l_{nonprogress}(t) = 0$
-- $b_{nonprogress} + c_{nonprogress} * \text{min}(l_{nonprogress}(t), \text{max}_{\text{nonprogress}})$ otherwise
+- $b_{nonprogress} + c_{nonprogress} * \text{min}(l_{nonprogress}(t), max_{nonprogress})$ otherwise
 
 The $l_{nonprogress}(t)$ term represents the number of consecutive penalizable non-progressive actions immediately before time step $t$. We say an action at time step $t$ is non-progressive if the action does not reduce the minimum number of time steps to the goal location. We say a non-progressive action at time step $t$ is penalizable if the agent cannot see any seekers at time step $t$.
 
@@ -112,7 +112,7 @@ The $b_{nonprogress}$ term is a bias associated with the $R_{nonprogress}(t)$ te
 
 The $c_{nonprogress}$ term is a positive coefficient associated with the $R_{nonprogress}(t)$ term (defaulted to $0.005$).
 
-The $\text{max}_{\text{nonprogress}}$ term is a constant associated with the $R_{nonprogress}(t)$ term representing the maximum number of consecutive penalizable non-progressive actions to punish for.
+The $max_{nonprogress}$ term is a constant associated with the $R_{nonprogress}(t)$ term representing the maximum number of consecutive penalizable non-progressive actions to punish for.
 
 $R_{step}$: the step penalty term
 
