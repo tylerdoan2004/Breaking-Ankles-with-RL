@@ -51,7 +51,7 @@ $$
 
 We explain each term of the reward function below.
 
-$\mathbf{R_{terminated}(t)}$: the terminal environment state reward term
+$\mathbf{R_{terminated}(t)}$**: the terminal environment state reward term**
 
 The terminal environment state reward term rewards or penalizes the agent for entering a terminal environment state. Specifically, the term evaluates to:
 - $0$ if the environment state at time step $t$ is not terminal 
@@ -61,7 +61,7 @@ The terminal environment state reward term rewards or penalizes the agent for en
     - a seeker intercepts the agent
     - the episode time limit is reached
 
-$\mathbf{R_{progress}(t)}$: the goal progress reward term
+$\mathbf{R_{progress}(t)}$**: the goal progress reward term**
 
 The goal progress reward term rewards progress towards the goal and penalizes regression from the goal. Specifically, we define the term as follows:
 
@@ -73,14 +73,16 @@ The $c_{progress}(t - 1)$ term is a positive coefficient associated with the goa
 - $0.05$ if the agent can see a seeker before it moves at time step $t - 1$
 - $0.1$ otherwise
 
-The $d_{goal}(t)$ term represents the agent's minimum number of time steps to reach the goal location given the environment state at time step $t$. The expression $d_{goal}(t−1) − d_{goal}(t)$ evaluates to:
+The $d_{goal}(t)$ term represents the agent's minimum number of time steps to reach the goal location given the environment state at time step $t$.
+
+The expression $d_{goal}(t−1) − d_{goal}(t)$ evaluates to:
 - $>0$ if the agent has progressed towards the goal location
 - $<0$ if the agent has regressed from the goal location
 - $0$ if the agent has neither progressed nor regressed from the goal location
 
 Note that we define $R_{progress}(0) = 0$.
 
-$\mathbf{R_{danger}(t)}$: the proximity penalty term
+$\mathbf{R_{danger}(t)}$**: the proximity penalty term**
 
 The proximity penalty term penalizes the agent for close proximity to seekers. Specifically, we define the term as follows:
 
@@ -98,17 +100,19 @@ The $a_{\text{visibility_radius}}$ term is the agent's visibility radius. This t
 
 For each visible seeker at time step $t$, the agent receives up to $c_{danger}$ in penalties, scaled linearly with respect to the agent’s distance to the visible seeker.
 
-$\mathbf{R_{nonprogress}(t)}$: the non-progress penalty term
+$\mathbf{R_{nonprogress}(t)}$**: the non-progress penalty term**
 
 The non-progress penalty term penalizes the agent for not making progress towards the goal location when safe. Specifically, the term evaluates to:
 - $0$ if $l_{nonprogress}(t) = 0$
-- $R_{nonprogress}(t) = b_{nonprogress} + c_{nonprogress} * min(l_{nonprogress}(t), max_{nonprogress})$ otherwise
+- $b_{nonprogress} + c_{nonprogress} * \text{min}(l_{nonprogress}(t), \text{max}_{nonprogress})$ otherwise
 
 The $l_{nonprogress}(t)$ term represents the number of consecutive penalizable non-progressive actions immediately before time step $t$. We say an action at time step $t$ is non-progressive if the action does not reduce the minimum number of time steps to the goal location. We say a non-progressive action at time step $t$ is penalizable if the agent cannot see any seekers at time step $t$.
 
 The $b_{nonprogress}$ term is a bias associated with the $R_{nonprogress}(t)$ term (defaulted to $0.025$).
+
 The $c_{nonprogress}$ term is a positive coefficient associated with the $R_{nonprogress}(t)$ term (defaulted to $0.005$).
-The $max_{nonprogress}$ term is a constant associated with the $R_{nonprogress}(t)$ term representing the maximum number of consecutive penalizable non-progressive actions to punish for.
+
+The $\text{max}_{nonprogress}$ term is a constant associated with the $R_{nonprogress}(t)$ term representing the maximum number of consecutive penalizable non-progressive actions to punish for.
 
 $R_{step}$: the step penalty term
 
