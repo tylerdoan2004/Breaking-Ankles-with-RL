@@ -144,11 +144,21 @@ Our training environment employs **two seekers**.
 | Seeker Velocity | 1 cell / time step |
 
 ### Algorithm
-We train our agent via the Proximal Policy Optimization (PPO) algorithm, an on-policy actor-critic method. In particular, we employ the implementation provided by the Stable Baselines3 library. At a high level, like any other policy gradient method, the algorithm operates by 1) collecting trajectories sampled using the current policy, 2) performing several mini-batch gradient updates using those trajectories, and 3) discarding the collected trajectories before repeating the above process [1]. A trajectory consists of a sequence of transitions collected under the current policy. Each transition typically consists of an observation $`o(s_t)`$, the reward $`r_t`$, the sampled action $`a_t`$, and the next observation $`o(s_{t+1})`$. PPO uses these trajectories to compute value targets and advantage estimates, providing data for policy updates.
+We train our agent via the Proximal Policy Optimization (PPO) algorithm, an on-policy actor-critic method. In particular, we employ the implementation provided by the Stable Baselines3 library. At a high level, like any other policy gradient method, the algorithm operates by 1) collecting trajectories sampled using the current policy, 2) performing several mini-batch gradient updates using those trajectories, and 3) discarding the collected trajectories before repeating the above process [1]. A trajectory consists of a sequence of transitions collected under the current policy. Each transition typically consists of an observation $o(s_t)$, the reward $r_t$, the sampled action $a_t$, and the next observation $o(s_{t+1})$. PPO uses these trajectories to compute value targets and advantage estimates, providing data for policy updates.
 
 PPO differs from more basic policy gradient methods by constraining how much the policy may change with each mini-batch gradient update. Specifically, PPO uses a clipped surrogate objective function to discourage large policy updates.
 
-Let $`r_(θ) = π_θ(a_t | s_t) / π_θ_old(a_t | s_t)`$ represent the probability ratio between the new and old policies. Let $`Â_t`$ represent the estimated advantage. The clipped policy loss is given by $`L^{clip}(θ) = \mathbb{E}_t[min(r_t(θ)Â_t, clip(r_t(θ), 1 - ε, 1 + ε)Â_t)]`$. PPO also trains a value function (typically via squared-error loss), and PPO often includes an entropy bonus to encourage exploration.
+Let $r_\theta$ represent the probability ratio between the new and old policies:
+```math
+r_\theta = \frac{\pi_\theta(a_t \mid s_t)}{\pi_{\theta_{\text{old}}}(a_t \mid s_t)}
+```
+
+Let $\hat{A}_t$ represent the estimated advantage. The clipped policy loss is given by:
+```math
+L^{\text{clip}}(\theta) = \mathbb{E}_t\left[\min\left(r_t(\theta)\hat{A}_t,\ \text{clip}(r_t(\theta),\ 1 - \varepsilon,\ 1 + \varepsilon)\hat{A}_t\right)\right]
+```
+
+PPO also trains a value function (typically via squared-error loss), and often includes an entropy bonus to encourage exploration.
 
 ### Training Hyperparameters
 We train our agent for 1,015,808 interaction steps. We list the default hyperparameter values for the Stable-Baselines3 implementation of the PPO algorithm below [2]:
