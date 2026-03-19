@@ -218,11 +218,11 @@ Finally, replacing the greedy seeker policy with a learned RL seeker agent would
 
 ### Libraries
 
-- **`tensorboard`** — Training metrics visualization (reward curves, loss, entropy)
-- **`moviepy`** — Testing video recording during training
-- **`stable_baselines3`** — PPO implementation, training loop, model checkpointing, and evaluation
-- **`gymnasium/minigrid`** — Grid rendering, tile-based visualization, and base environment class
-- **`torch`** — Neural network backend for PPO policy and value networks
+- **tensorboard** — Training metrics visualization (reward curves, outcome curves, loss)
+- **moviepy** — Video recording during training
+- **stable_baselines3** — PPO implementation, training loop, model checkpointing, and evaluation
+- **gymnasium/minigrid** — Grid rendering, tile-based visualization, and base environment class
+- **torch** — Required by Stable Baselines3
 
 ### Documentation & References
 - [Stable-Baselines3](https://stable-baselines3.readthedocs.io) — PPO hyperparameter tuning, callback setup, vectorized environments
@@ -230,4 +230,4 @@ Finally, replacing the greedy seeker policy with a learned RL seeker agent would
 - [MiniGrid](https://minigrid.farama.org) — Grid rendering and custom world objects
 
 ### AI Usage
-AI was utilized as a tool to explore initial ideas — such as identifying candidate algorithms, tuning parameters, and scoping implementation options. It also served as a coding assistant for debugging and generating small code snippets. Additionally, it was used as a grammar checker for the report. 
+AI was utilized as a tool to explore initial ideas, like identifying candidate algorithms and scoping implementation options. AI was also used to assist in hyperparameter tuning. AI also served as a coding assistant for debugging persistent dynamics issues and for generating small code snippets. Additionally, it was used as a grammar checker for the report.
