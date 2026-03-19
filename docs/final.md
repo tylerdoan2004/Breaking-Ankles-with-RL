@@ -144,19 +144,19 @@ Our training environment employs **two seekers**.
 | Seeker Velocity | 1 cell / time step |
 
 ### Algorithm
-We train our agent via the Proximal Policy Optimization (PPO) algorithm, an on-policy actor-critic method. In particular, we employ the implementation provided by the Stable Baselines3 library. At a high level, like any other policy gradient method, the algorithm operates by 1) collecting trajectories sampled using the current policy, 2) performing several mini-batch gradient updates using those trajectories, and 3) discarding the collected trajectories before repeating the above process [1]. A trajectory consists of a sequence of transitions collected under the current policy. Each transition typically consists of an observation $o(s_t)$, the reward $r_t$, the sampled action $a_t$, and the next observation $o(s_{t+1})$. PPO uses these trajectories to compute value targets and advantage estimates, providing data for policy updates.
+We train our agent via the Proximal Policy Optimization (PPO) algorithm, an on-policy actor-critic method. In particular, we employ the implementation provided by the Stable Baselines3 library. At a high level, like any other policy gradient method, the algorithm operates by 1) collecting trajectories sampled using the current policy, 2) performing several mini-batch gradient updates using those trajectories, and 3) discarding the collected trajectories before repeating the above process [1]. A trajectory consists of a sequence of transitions collected under the current policy. Each transition typically consists of an observation ![o(s_t)](https://latex.codecogs.com/svg.image?o(s_t)), the reward ![r_t](https://latex.codecogs.com/svg.image?r_t), the sampled action ![a_t](https://latex.codecogs.com/svg.image?a_t), and the next observation ![o(s_{t+1})](https://latex.codecogs.com/svg.image?o(s_{t&plus;1})). PPO uses these trajectories to compute value targets and advantage estimates, providing data for policy updates.
 
 PPO differs from more basic policy gradient methods by constraining how much the policy may change with each mini-batch gradient update. Specifically, PPO uses a clipped surrogate objective function to discourage large policy updates.
 
-Let $r_\theta$ represent the probability ratio between the new and old policies:
-```math
-r_\theta = \frac{\pi_\theta(a_t \mid s_t)}{\pi_{\theta_{\text{old}}}(a_t \mid s_t)}
-```
+Let ![r_theta](https://latex.codecogs.com/svg.image?r_\theta) represent the probability ratio between the new and old policies:
 
-Let $\hat{A}_t$ represent the estimated advantage. The clipped policy loss is given by:
-```math
-L^{\text{clip}}(\theta) = \mathbb{E}_t\left[\min\left(r_t(\theta)\hat{A}_t,\ \text{clip}(r_t(\theta),\ 1 - \varepsilon,\ 1 + \varepsilon)\hat{A}_t\right)\right]
-```
+![ratio](https://latex.codecogs.com/svg.image?r_\theta=\frac{\pi_\theta(a_t\mid&space;s_t)}{\pi_{\theta_{\text{old}}}(a_t\mid&space;s_t)})
+
+Let ![A_hat](https://latex.codecogs.com/svg.image?\hat{A}_t) represent the estimated advantage. The clipped policy loss is given by:
+
+![clipped loss](https://latex.codecogs.com/svg.image?L^{\text{clip}}(\theta)=\mathbb{E}_t\left[\min\left(r_t(\theta)\hat{A}_t,\,\text{clip}(r_t(\theta),1-\varepsilon,1&plus;\varepsilon)\hat{A}_t\right)\right])
+
+PPO also trains a value function (typically via squared-error loss), and often includes an entropy bonus to encourage exploration.v
 
 PPO also trains a value function (typically via squared-error loss), and often includes an entropy bonus to encourage exploration.
 
