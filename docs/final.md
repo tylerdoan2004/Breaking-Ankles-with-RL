@@ -148,7 +148,7 @@ We train our agent via the Proximal Policy Optimization (PPO) algorithm, an on-p
 
 PPO differs from more basic policy gradient methods by constraining how much the policy may change with each mini-batch gradient update. Specifically, PPO uses a clipped surrogate objective function to discourage large policy updates.
 
-Let $r_(θ) = π_θ(a_t | s_t) / π_θ_old(a_t | s_t)$ represent the probability ratio between the new and old policies. Let $Â_t$ represent the estimated advantage. The clipped policy loss is given by $L^{clip}(θ) = \mathbb{E}_t[min(r_t(θ)Â_t, clip(r_t(θ), 1 - ε, 1 + ε)Â_t)]$. PPO also trains a value function (typically via squared-error loss), and PPO often includes an entropy bonus to encourage exploration.
+Let $r_t(\theta) = \pi_\theta(a_t \mid s_t) / \pi_{\theta_{\mathrm{old}}}(a_t \mid s_t)$ represent the probability ratio between the new and old policies. Let $\hat{A}_t$ represent the estimated advantage. The clipped policy loss is given by $L^{\text{clip}}(\theta) = \mathbb{E}_t\left[\min\left(r_t(\theta)\hat{A}_t,\; \mathrm{clip}(r_t(\theta), 1-\epsilon, 1+\epsilon)\hat{A}_t\right)\right]$. PPO also trains a value function (typically via squared-error loss), and PPO often includes an entropy bonus to encourage exploration.
 
 ### Training Hyperparameters
 We train our agent for 1,015,808 interaction steps. We list the default hyperparameter values for the Stable-Baselines3 implementation of the PPO algorithm below [2]:
