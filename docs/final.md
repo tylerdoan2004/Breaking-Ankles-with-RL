@@ -5,9 +5,13 @@ title: Final Report
 
 # Breaking Ankles with RL
 
+---
+
 ## Video
 
 <iframe width="560" height="315" src="https://www.youtube.com/embed/9dfKkI4hmZ8?si=EOYuVOcZ_PDa34vs" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>
+
+---
 
 ## Project Summary
 
@@ -24,6 +28,8 @@ Our training environment is a 30-by-30 gridworld consisting of static obstacles 
 Our project is directly related to real-world autonomous navigation tasks in dynamic and uncertain environments, where an agent must make progress towards a long-term objective while responding to immediate safety risks. In domains like robotic exploration and search-and-rescue, agent success depends not only on whether it can reach the goal location, but also whether it can reach the goal location safely under partial observability. Our project isolates this challenge into a gridworld setting: our environment incorporates both static and dynamic hazards, and our agent operates under partial observability.
 
 What makes this problem non-trivial is the tension between two competing objectives: reaching the goal location in as few time steps as possible and avoiding threats to the agent. The agent must simultaneously reason about long-term goal achievement and short-term reactive avoidance. Because seekers can move according to distinct (and sometimes non-deterministic) policies, the agent cannot simply apply a handcrafted policy and must actively adapt to dynamic threats. Partial observability further compounds the problem’s difficulty: the agent cannot rely on full knowledge of the environment state and must instead infer danger from limited local observations and recent temporal history. These constraints make straightforward heuristics alone insufficient: a greedy navigation strategy, for example, does not account for seeker behavior, while a conservative navigation strategy may idle or timeout. These constraints, therefore, necessitate the use of reinforcement learning.
+
+---
 
 ## Approach
 
@@ -64,13 +70,13 @@ R_{progress}(t) = c_{progress}(t−1) * (d_{goal}(t−1) − d_{goal}(t))
 $$
 
 The $c_{progress}(t - 1)$ term is a positive coefficient associated with the goal progress reward term. This term evaluates to:
-– $0.05$ if the agent can see a seeker before it moves at time step $t - 1$
+- $0.05$ if the agent can see a seeker before it moves at time step $t - 1$
 - $0.1$ otherwise
 
 The $d_{goal}(t)$ term represents the agent's minimum number of time steps to reach the goal location given the environment state at time step $t$. The expression $d_{goal}(t−1) − d_{goal}(t)$ evaluates to:
-– A positive value if the agent has progressed towards the goal location
-– A negative value if the agent has regressed from the goal location
-– Zero if the agent has neither progressed nor regressed from the goal location
+- $>0$ if the agent has progressed towards the goal location
+- $<0$ if the agent has regressed from the goal location
+- $0$ if the agent has neither progressed nor regressed from the goal location
 
 Note that we define $R_{progress}(0) = 0$.
 
@@ -95,20 +101,18 @@ For each visible seeker at time step $t$, the agent receives up to $c_{danger}$ 
 $R_{nonprogress}(t)$: the non-progress penalty term
 
 The non-progress penalty term penalizes the agent for not making progress towards the goal location when safe. Specifically, the term evaluates to:
-– $0$ if $l_{nonprogress}(t) = 0$
-– $R_{nonprogress}(t) = b_{nonprogress} + c_{nonprogress} * min(l_{nonprogress}(t), max_{nonprogress})$ otherwise
+- $0$ if $l_{nonprogress}(t) = 0$
+- $R_{nonprogress}(t) = b_{nonprogress} + c_{nonprogress} * min(l_{nonprogress}(t), max_{nonprogress})$ otherwise
 
-The $l_{nonprogress}(t)$ term represents the number of consecutive penalizable non-progressive actions immediately before time step $t$.
-
-We say an action at time step $t$ is non-progressive if the action does not reduce the minimum number of time steps to the goal location. We say a non-progressive action at time step $t$ is penalizable if the agent cannot see any seekers at time step $t$.
+The $l_{nonprogress}(t)$ term represents the number of consecutive penalizable non-progressive actions immediately before time step $t$. We say an action at time step $t$ is non-progressive if the action does not reduce the minimum number of time steps to the goal location. We say a non-progressive action at time step $t$ is penalizable if the agent cannot see any seekers at time step $t$.
 
 The $b_{nonprogress}$ term is a bias associated with the $R_{nonprogress}(t)$ term (defaulted to $0.025$).
 The $c_{nonprogress}$ term is a positive coefficient associated with the $R_{nonprogress}(t)$ term (defaulted to $0.005$).
 The $max_{nonprogress}$ term is a constant associated with the $R_{nonprogress}(t)$ term representing the maximum number of consecutive penalizable non-progressive actions to punish for.
 
-$R_step$: the step penalty term
+$R_{step}$: the step penalty term
 
-The step penalty term penalizes the agent for time inefficiency. Specifically, we define the term as the constant `0.01`.
+The step penalty term penalizes the agent for time inefficiency. Specifically, we define the term as the constant $0.01$.
 
 #### Action Space
 
@@ -172,6 +176,8 @@ We tuned our hyperparameters manually based on the agent’s goal rate curve. To
 
 [2] Stable Baselines3, “PPO — Stable Baselines3 1.4.1a3 documentation,” stable-baselines3.readthedocs.io, Mar. 18, 2026. https://stable-baselines3.readthedocs.io/en/master/modules/ppo.html
 
+---
+
 ## Evaluation
 
 Our primary evaluation metrics are success rate (percentage of episodes where the agent reaches the goal), interception rate (percentage of episodes where a seeker intercepts the agent), collision rate (percentage of episodes where the agent collides with an obstacle or boundary), and timeout rate (percentage of episodes that exhaust the step limit).
@@ -196,6 +202,8 @@ The most immediate next step is training on procedurally generated environments.
 Another progression step is to introduce more realistic agent dynamics. The current model assumes constant velocity and unconstrained movement in all directions. Incorporating acceleration, inertia, and orientation-based observability, where the agent can only see in the direction it is facing, would meaningfully increase the difficulty of the evasion problem. Extending the framework from discrete to continuous action and state spaces, and from two dimensions to three using a physics simulator such as PyBullet would also help to align the project with more realistic use cases. 
 
 Finally, replacing the greedy seeker policy with a learned RL seeker agent would introduce a genuine adversarial dynamic, requiring the agent to develop avoidance behavior that generalizes beyond a fixed pursuit pattern.
+
+---
 
 ## Resources Used
 
