@@ -51,7 +51,7 @@ $$
 
 We explain each term of the reward function below.
 
-$R_{terminated}(t)$: the terminal environment state reward term
+$\mathbf{R_{terminated}(t)}$: the terminal environment state reward term
 
 The terminal environment state reward term rewards or penalizes the agent for entering a terminal environment state. Specifically, the term evaluates to:
 - $0$ if the environment state at time step $t$ is not terminal 
@@ -61,7 +61,7 @@ The terminal environment state reward term rewards or penalizes the agent for en
     - a seeker intercepts the agent
     - the episode time limit is reached
 
-$R_{progress}(t)$: the goal progress reward term
+$\mathbf{R_{progress}(t)}$: the goal progress reward term
 
 The goal progress reward term rewards progress towards the goal and penalizes regression from the goal. Specifically, we define the term as follows:
 
@@ -80,12 +80,12 @@ The $d_{goal}(t)$ term represents the agent's minimum number of time steps to re
 
 Note that we define $R_{progress}(0) = 0$.
 
-$R_{danger}(t)$: the proximity penalty term
+$\mathbf{R_{danger}(t)}$: the proximity penalty term
 
 The proximity penalty term penalizes the agent for close proximity to seekers. Specifically, we define the term as follows:
 
 $$
-R_{danger}(t) = \sum_{s \in VS(t)}(c_{danger} * (1 - d(a(t), s) / a_{visibility_radius}))
+R_{danger}(t) = \sum_{s \in VS(t)}(c_{danger} * (1 - d(a(t), s) / a_{\text{visibility_radius}}))
 $$
 
 The $VS(t)$ term represents the set of coordinates corresponding to seekers visible to the agent at time step $t$.
@@ -94,11 +94,11 @@ The $c_{danger}$ term is a positive coefficient associated with the proximity pe
 
 The $d(a(t), s)$ term is the distance between the agent's coordinates and a visible seeker's coordinates at time step $t$ according to some distance metric $t$. The distance metric defaults to the Chebyshev distance.
 
-The $a_{visibility_radius}$ term is the agent's visibility radius. This term defaults to $3$ in the YAML configuration file.
+The $a_{\text{visibility_radius}}$ term is the agent's visibility radius. This term defaults to $3$ in the YAML configuration file.
 
 For each visible seeker at time step $t$, the agent receives up to $c_{danger}$ in penalties, scaled linearly with respect to the agent’s distance to the visible seeker.
 
-$R_{nonprogress}(t)$: the non-progress penalty term
+$\mathbf{R_{nonprogress}(t)}$: the non-progress penalty term
 
 The non-progress penalty term penalizes the agent for not making progress towards the goal location when safe. Specifically, the term evaluates to:
 - $0$ if $l_{nonprogress}(t) = 0$
