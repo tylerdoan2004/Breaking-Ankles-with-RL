@@ -216,43 +216,47 @@ Besides demonstrating that PPO substantially improves over the course of trainin
 
 ### Qualitative Evaluation
 
-**PPO Agent vs. Greedy Seekers**
-*Early Training*
+#### PPO Agent vs. Greedy Seekers
+
+***Early Training***
 <video width="480" height="480" controls>
     <source src="assets/evaluations/PPO Agent vs Greedy Seekers/Early Training.mp4">
     Your browser does not support the video tag.
 </video>
 
-*During Training*
+***During Training***
 <video width="480" height="480" controls>
     <source src="assets/evaluations/PPO Agent vs Greedy Seekers/During Training.mp4">
     Your browser does not support the video tag.
 </video>
 
-*After Training*
+***After Training***
 <video width="480" height="480" controls>
     <source src="assets/evaluations/PPO Agent vs Greedy Seekers/After Training.mp4">
     Your browser does not support the video tag.
 </video>
 
-**PPO Agent vs. A* Seekers**
-*Early Training*
+#### PPO Agent vs. A* Seekers
+
+***Early Training***
 <video width="480" height="480" controls>
     <source src="assets/evaluations/PPO Agent vs A-Star Seekers/Early Training.mp4">
     Your browser does not support the video tag.
 </video>
 
-*During Training*
+***During Training***
 <video width="480" height="480" controls>
     <source src="assets/evaluations/PPO Agent vs A-Star Seekers/During Training.mp4">
     Your browser does not support the video tag.
 </video>
 
-*After Training*
+***After Training***
 <video width="480" height="480" controls>
     <source src="assets/evaluations/PPO Agent vs A-Star Seekers/After Training.mp4">
     Your browser does not support the video tag.
 </video>
+
+#### Qualitative Analysis
 
 Qualitatively, the PPO agent exhibits clear reactive avoidance behavior. Early during training, the PPO agent struggles to make progress towards the goal location; per our above analysis, we expect this behavior, as the policy is initially close to random. As training progresses, the PPO agent learns to make strong progress towards the goal location. Against greedy seekers, the PPO agent learns to "wait" slightly until a seeker enters its visibility radius; at that point, the PPO agent visibly deviates from the direct path to the goal location, opting to take an indirect route that maintains distance from any seeker. Against A\* seekers, the PPO agent learns to take a minimal "sidestep" from the direct path to the goal location.
 
