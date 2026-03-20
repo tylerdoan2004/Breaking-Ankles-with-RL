@@ -21,7 +21,7 @@ We implement a configurable training environment in Python using Gymnasium, a po
 
 We provide a visual representation (rendered by Minigrid) of our training environment below:
 
-<img src="images/Training Environment.png" width="300" height="300" alt="Visual Representation of Training Environment">
+<img src="assets/Training Environment.png" width="300" height="300" alt="Visual Representation of Training Environment">
 
 Our training environment is a 30-by-30 gridworld consisting of static obstacles scattered throughout the gridworld. The agent is placed at (28, 1), and the two seekers are placed at (3, 17) and (16, 27). The goal location is placed at (0, 28). As highlighted in faint gray, the agent has a visibility radius of three cells.
 
