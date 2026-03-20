@@ -184,28 +184,89 @@ We tuned our hyperparameters manually based on the agent’s goal rate curve. To
 
 ## Evaluation
 
-Our primary evaluation metrics are success rate (percentage of episodes where the agent reaches the goal), interception rate (percentage of episodes where a seeker intercepts the agent), collision rate (percentage of episodes where the agent collides with an obstacle or boundary), and timeout rate (percentage of episodes that exhaust the step limit).
+We evaluate whether PPO learns a reactive avoidance policy that can successfully reach the goal location in the presence of dynamic seekers. We compare the PPO agent against a deterministic partially observable A\* baseline. In all experiments, the objective is the same: the agent must navigate to a goal location while avoiding two seekers. We consider two seeker behaviors: a greedy policy minimizing Chebyshev distance to the agent and an A\*-based policy minimizing path distance to the agent.
 
-**Quantitative Results**:  
-After training for 1,000,000 steps, the agent achieves an **89% goal rate** and a **0% timeout rate** on the training environment. The 0% timeout rate is particularly notable — the agent always attempts to make progress and never idles indefinitely. Interception rate decreases steadily over the course of training as the agent learns to anticipate and evade seeker trajectories.
+In total, we perform four experiments: the PPO agent vs. greedy seekers, the PPO agent vs. A\* seekers, the baseline agent vs. greedy seekers, and the baseline agent vs. A\* seekers.
 
-**Training Curves**:  
+The training pipeline monitors performance, saves the best checkpoints, and records videos before, during, and after training.
 
-<!-- PUT THE PLOTS HERE -->
+### Quantitative Evaluation
 
-The TensorBoard training curves reveal several phases of learning. The collision rate fluctuates early in training as the agent explores different paths through the obstacle layout, then stabilizes as it converges on consistent routes. The interception rate decreases over time, reflecting the agent's growing competence at reactive avoidance. Episode reward increases monotonically and stabilizes, and episode length remains well below the step limit throughout training, consistent with the 0% timeout rate.
+For quantitative evaluation, we track five metrics: goal rate (percentage of episodes where the agent reaches the goal), collision rate (percentage of episodes where the agent collides with an obstacle, a seeker, or a boundary), interception rate (percentage of episodes where a seeker intercepts the agent), timeout rate (percentage of episodes that exhaust the step limit), and path efficiency (the ratio between the minimum number of time steps required to progress from the starting location to the goal location and the actual number of time steps taken). Goal rate is the primary success metric: we consider the task solved only when the agent actually reaches the goal location. Collision rate, interception rate, and timeout rate measure failure modes and capture the safety and robustness of the policy. Path efficiency measures how direct successful trajectories are. We use path efficiency as a secondary success metric. Note that agents may have high path efficiency while failing most episodes overall; as such, we consider goal rate and failure rates as more important than path efficiency when judging an agent's performance on the task.
 
-**Qualitative Results**:  
-Qualitatively, the agent demonstrates clear reactive avoidance behavior. When a seeker enters its observation window, the agent visibly deviates from the direct path to the goal, taking an indirect route that maintains distance from the threat before resuming goal-directed movement. The agent also shows high path efficiency — it does not wander or backtrack unnecessarily, and consistently reaches the goal in near-optimal step counts given the presence of seekers.
+In all subsequent figures, the orange line corresponds to the PPO agent vs. greedy seekers, the dark blue line corresponds to the PPO agent vs. A\* seekers, the red line corresponds to the baseline agent vs. greedy seekers, and the light blue line corresponds to the baseline agent vs. A\* seekers. All values discussed are smoothed (per TensorBoard defaults).
 
-## Future Work
-The current implementation establishes a strong foundation for reactive avoidance in a fixed discrete environment, but several natural extensions would meaningfully increase the generality and realism of the framework.
+<img src="assets/evaluations/outcomes_goal_rate.png" width="1209" height="331" alt="Goal Rate Curve">
 
-The most immediate next step is training on procedurally generated environments. The current policy is trained on a single fixed configuration, which means the BFS time-to-goal map and the obstacle layout are constant across all training episodes. Moving to batch-generated environments with varied obstacle placements, seeker starting positions, and grid layouts would force the agent to learn a more general avoidance policy rather than one that is specialized to a particular map. This is the clearest path toward a policy that transfers to new environements during testing.
+The goal rate curve demonstrates that PPO substantially improves over the course of training. Early in training, from time step 0 to time step 245,000, the PPO agent achieves a 0% goal rate against both greedy seekers and A\* seekers. We expect this behavior, as the policy is initially close to random. As training progresses, goal rate increases sharply. From time step 245,000 to 444,000, the PPO agent's goal rate **increases from 0% to 69.50%** against greedy seekers; from time step 262,000 to 393,000, the PPO agent's goal rate **increases from 0% to 60.65%** against A\* seekers. This sharp increase in goal rate likely occurs once PPO discovers a policy that consistently makes safe progress towards the goal. Once the policy chains together goal-directed moves while avoiding nearby seekers, the agent receives a stronger and more positive reward signal; the PPO learning algorithm utilizes this positive reinforcement to reinforce this behavior (thus producing the sharp increase in goal rate). From time step 444,000 to 1,015,808, the PPO agent's goal rate **increases from 69.5% to 89.05%** against greedy seekers; from time step 393,000 to 1,015,808, the PPO agent's goal rate **increases from 60.65% to 97.32%** against A\* seekers. This convergence in goal rate likely occurs with the agent approaching a stable high-return policy; as the agent approaches this policy, further improvements become less frequent. The linear learning-rate schedule likely improved this convergence: late-stage training updates become less aggressive, and the policy settles rather than oscillating.
 
-Another progression step is to introduce more realistic agent dynamics. The current model assumes constant velocity and unconstrained movement in all directions. Incorporating acceleration, inertia, and orientation-based observability, where the agent can only see in the direction it is facing, would meaningfully increase the difficulty of the evasion problem. Extending the framework from discrete to continuous action and state spaces, and from two dimensions to three using a physics simulator such as PyBullet would also help to align the project with more realistic use cases. 
+<img src="assets/evaluations/outcomes_collision_rate.png" width="1209" height="330" alt="Collision Rate Curve">
 
-Finally, replacing the greedy seeker policy with a learned RL seeker agent would introduce a genuine adversarial dynamic, requiring the agent to develop avoidance behavior that generalizes beyond a fixed pursuit pattern.
+<img src="assets/evaluations/outcomes_interception_rate.png" width="1209" height="330" alt="Interception Rate Curve">
+
+The collision rate and the interception rate curves illustrate the PPO agent's failure modes. We omit the timeout rate curve, as only one experiment involved the agent timing out: the PPO agent timed out against A\* seekers at a negligible rate (decreasing from 1% to <0.0001% from time step 311,000 to 1,015,808).
+
+From the beginning of training to the end of training, the PPO agent's collision rate **decreased from 95% to 2.79%** against greedy seekers; from time step 0 to 557,000, the PPO agent's collision rate **decreased from 92.50% to 7.51%** against A\* seekers. After a sharp increase in collision rate from 7.51% to 32.03% from time step 557,000 to 573,000, the PPO agent's collision rate again **decreased from 32.03% to 1.08%** against A\* seekers. In both experiments, the consistent decrease in collision rate naturally coincides with the increase in goal rate; as PPO discovers a high-return policy that makes safe progress towards the goal, the policy naturally fails less. We believe the PPO agent's mid-training sharp increase in collision rate against A\* seekers reflects a short-term policy oscillation. With a non-zero entropy bonus (`ent_coef = 0.005`), mid-training oscillations may occur even with a decaying linear learning-rate schedule.
+
+From time step 0 to 196,000, the PPO agent's interception rate increased from 5% to 68.80% against greedy seekers; from time step 0 to 278,000, the PPO agent's interception rate increased from 7.5% to 68.61% against A\* seekers. Again, we expect this behavior, as the policy is initially close to random. As training progresses, interception rate decreases sharply. From time step 196,000 to 1,015,808, the PPO agent's interception rate **decreased from 68.80% to 8.16%** against greedy seekers; from time step 278,000 to 1,015,808, the PPO agent's interception rate **decreased from 68.61% to 1.58%** against A\* seekers. Similar to the decrease in collision rate, the consistent decrease in interception rate naturally coincides with the increase in goal rate; as PPO discovers a high-return policy, the policy naturally fails less. We believe A\* seekers intercept the PPO agent less than greedy seekers because A\* seekers are more predictable. A greedy seeker chooses uniformly at random among all legal moves that minimize Chebyshev distance to the agent, whereas an A\* seeker follows a deterministic shortest-path plan to the agent (falling back to greedy behavior if no path exists). Because of this deterministic behavior in A\* seekers, the PPO agent can learn a more reliable evasive response against A\* seekers. Against greedy seekers, however, the non-deterministic tie-breaking leaves a persistent source of uncertainty; this uncertainty may keep the interception rate somewhat significant.
+
+<img src="assets/evaluations/episode_path_efficiency.png" width="1209" height="330" alt="Episode Path Efficiency Curve">
+
+Besides demonstrating that PPO substantially improves over the course of training, we demonstrate that PPO significantly outperforms the deterministic partially observable A\* baseline agent and learns a reactive-avoidance policy. The deterministic partially observable A\* baseline agent operates by treating seekers as static obstacles. As such, the baseline agent employs a weak strategy for avoiding moving seekers. As a consequence, the baseline agent performs poorly on outcome-based metrics despite having perfect path efficiency. The baseline agent's behavior exhibits the core tradeoff in the reactive avoidance problem: an agent that ignores the dynamic intent of the seekers may move efficiently when the seekers "cooperate", but the agent fails much more often when the seekers actively pressure the agent. PPO learns to sacrifice some path efficiency in order to remain safe and still reach the goal location.
+
+### Qualitative Evaluation
+
+**PPO Agent vs. Greedy Seekers**
+*Early Training*
+<video width="480" height="480" controls>
+    <source src="assets/evaluations/PPO Agent vs Greedy Seekers/Early Training.mp4">
+    Your browser does not support the video tag.
+</video>
+
+*During Training*
+<video width="480" height="480" controls>
+    <source src="assets/evaluations/PPO Agent vs Greedy Seekers/During Training.mp4">
+    Your browser does not support the video tag.
+</video>
+
+*After Training*
+<video width="480" height="480" controls>
+    <source src="assets/evaluations/PPO Agent vs Greedy Seekers/After Training.mp4">
+    Your browser does not support the video tag.
+</video>
+
+**PPO Agent vs. A* Seekers**
+*Early Training*
+<video width="480" height="480" controls>
+    <source src="assets/evaluations/PPO Agent vs A-Star Seekers/Early Training.mp4">
+    Your browser does not support the video tag.
+</video>
+
+*During Training*
+<video width="480" height="480" controls>
+    <source src="assets/evaluations/PPO Agent vs A-Star Seekers/During Training.mp4">
+    Your browser does not support the video tag.
+</video>
+
+*After Training*
+<video width="480" height="480" controls>
+    <source src="assets/evaluations/PPO Agent vs A-Star Seekers/After Training.mp4">
+    Your browser does not support the video tag.
+</video>
+
+Qualitatively, the PPO agent exhibits clear reactive avoidance behavior. Early during training, the PPO agent struggles to make progress towards the goal location; per our above analysis, we expect this behavior, as the policy is initially close to random. As training progresses, the PPO agent learns to make strong progress towards the goal location. Against greedy seekers, the PPO agent learns to "wait" slightly until a seeker enters its visibility radius; at that point, the PPO agent visibly deviates from the direct path to the goal location, opting to take an indirect route that maintains distance from any seeker. Against A\* seekers, the PPO agent learns to take a minimal "sidestep" from the direct path to the goal location.
+
+**Conclusion**:
+Overall, these results support the claim that PPO successfully learns a reactive avoidance policy in this environment. The strongest evidence supporting this claim is the simultaneous increase in goal rate and decrease in collision and interception rates. The deterministic partially observable A\* baseline agent demonstrates why our problem requires reinforcement learning agents: shortest-path planning under partial observability is not enough when threats are dynamic. Note that broader claims about generalization would require environment variations and out-of-distribution analysis.
+
+### Future Work
+The current experiment implementation establishes a strong foundation for reactive avoidance in a fixed discrete environment. To increase the generality and realism of this framework, we discuss several natural extensions.
+
+The most immediate next step is to train on procedurally generated environments. Our current policy is trained on a single fixed configuration. As such, our PPO agent's behavior may not generalize to other environments. Moving to procedurally generated environments with varied obstacle placements, seeker starting locations, and grid layouts would force the agent to learn a more general avoidance policy rather than one specialized to a particular map. Performing well on this next step would lead to a policy that generalizes to new, unseen environments during testing.
+
+Another next step is to introduce more realistic environment dynamics. Our current experiment implementation employs constant velocity and unconstrained movement in all directions (for both the agent and the seekers). Incorporating acceleration, inertia, and orientation-based observability would meaningfully increase the realism of this reactive avoidance framework. Additionally, extending the framework to a three-dimensional continuous environment would align the project with more realistic use cases.
+
+Finally, replacing the seekers' policy with a learnable agent would introduce an adversarial multi-agent learning setting. In the current implementation, the seekers follow fixed hand-designed policies, so the PPO agent trains against a stationary opponent. If the seekers were also trained, the environment becomes non-stationary: as the seekers improve their interception behavior, the agent would need to adapt its avoidance strategy. This new framework could introduce a more robust and general avoidance policy, because success would require avoiding increasingly capable adversaries.
 
 ---
 
